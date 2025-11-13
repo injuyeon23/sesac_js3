@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+    </head>
+    <body>
+        <h1>내 폼으로 데이터 서버 전송하기</h1>
+        <form>
+            <label>아이디</label>
+            <!-- 주석:command+/ (편집메뉴에서도 찾을 수 있음) -->
+            <!-- name은 서버로 전송될 때 KEY, 사용자가 입력한 값은 VALUE라고 불리며 전송됨 -->
+            <input type="text" name="id">
+            <label>비밀번호</label>
+            <!-- 여기서는 key가 pw, value는 사용자가 입력한 실제 비밀번호 -->
+            <input type="password" name="pw">
+            <!-- submit 타입은 실제로 이 form에 입력된 모든 값을 다 합쳐서 서버로 보내는 기능임 -->
+            <input type="submit" value="로그인"> 
+        </form>
+        <h2>세로 입력한 로그인 폼</h2>
+        <!-- 전송방식을 내가 지정하지 않으면 기본값은 get방식이다 -->
+        <form method="post">
+        
+            <label>아이디</label>
+            <input type="text" name="id"><br>
+            <label>비밀번호</label>
+            <input type="password" name="pw"><br>
+            <input type="submit" value="로그인">
+        </form>
+        <h2>네이버 따라하기</h2>
+        <form method="get">
+            <!-- mathode는 get또는 둘다 GET둘다 무방함 또는 안써도 어차피 겟 -->
+            <input type="text" name="query" placeholder="키워드를 입력해주세요">
+            <input type="submit" value="검색">
+        </form>
+        <!-- 옵션+쉬프트+f: 보기좋게 코드를 포맷팅 -->
+
+    </body>
+</html>
