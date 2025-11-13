@@ -1,0 +1,16 @@
+
+        h1, h2 {
+            text-align: center;
+        }
+        table th, table td {
+            text-align: center;
+            width: 10%;
+        }
+        th:first-child {
+            color: red; 
+        }
+        #calendar {
+            width: 70%;
+            border: 1px solid black;
+            background-color: white;
+        }
