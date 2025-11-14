@@ -5,12 +5,24 @@
         table th, table td {
             text-align: center;
             width: 10%;
+            border: 1px solid black;
         }
         th:first-child {
             color: red; 
         }
-        #calendar {
+        .week {
+            background-color: #d3d3d3;
+        }
+        .calendar {
             width: 70%;
-            border: 1px solid black;
-            background-color: white;
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+        .heading_img {
+            width: 100%;
+            padding-top: 40%;
+            background-image: url(../2.MAIN/image/christmas.jpg);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
         }

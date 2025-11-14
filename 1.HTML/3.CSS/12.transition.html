@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .square {
+            width: 100px;
+            height: 100px;
+            background-color: rgb(255, 255, 142);
+            transition-property: width, height;/* 내가 어디서 변화를 줄건지 정의 */
+            transition-duration: 2s; /*그 변화를 2초에 걸쳐서 준다*/
+        }
+        .square:hover { /*호버 - 마우스가 올라간 걸 뜻하는 기술용어 */
+            width: 500px;
+            height: 500px;
+        }
+        .button {
+            color: rgb(28, 138, 102);
+            transition-property: color; /*뭘 바꿀 거임?*/
+            transition-duration: 3.0s;
+        }
+        .button:hover {
+            color: blueviolet;
+        }
+        .image {
+            width: 200px;
+            transition-property: transform;
+            transition-duration: 1.0s;
+        }
+        .image:hover {
+            transform: rotate(180deg);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="square"></div>
+    <hr>
+    <button class="button">Hover me</button>
+    <img class="image" src="image/cat.jpg" alt="">
+    
+</body>
+</html>
