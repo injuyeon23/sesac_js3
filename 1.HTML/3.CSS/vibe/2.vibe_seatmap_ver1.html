@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>자리배치표</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        /* 전체 배치 컨테이너 */
+        .classroom {
+            display: flex;
+            gap: 60px; /* 왼쪽 줄과 오른쪽 모둠 간 거리 */
+        }
+
+        /* 왼쪽 줄(5좌석) */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 350px; /* 모둠 2개 높이에 맞춘 값 */
+        }
+
+        .seat {
+            width: 80px;
+            height: 45px;
+            border: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 4px 0;
+            background: #f7f7f7;
+            border-radius: 6px;
+        }
+
+        /* 모둠 2개를 세로로 */
+        .groups {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* 개별 모둠 테이블 */
+        .group-box {
+            border: 2px solid #555;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        /* 모둠 내부 2줄 */
+        .group-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .group-seat {
+            width: 80px;
+            height: 45px;
+            border: 1px solid #222;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>웹개발 반 자리배치표</h1>
+    <p>주 1회 랜덤으로 자리를 섞는 시스템임</p>
+
+    <div class="classroom">
+
+        <!-- 강사 기준 오른쪽: 줄 5좌석 -->
+        <div class="right-column">
+            <div class="seat" id="R1"></div>
+            <div class="seat" id="R2"></div>
+            <div class="seat" id="R3"></div>
+            <div class="seat" id="R4"></div>
+            <div class="seat" id="R5"></div>
+        </div>
+
+        <!-- 강사 기준 왼쪽: 모둠 2개 -->
+        <div class="groups">
+
+            <!-- 앞 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="A"></div>
+                    <div class="group-seat" id="B"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="C"></div>
+                    <div class="group-seat" id="D"></div>
+                </div>
+            </div>
+
+            <!-- 뒤 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="E"></div>
+                    <div class="group-seat" id="F"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="G"></div>
+                    <div class="group-seat" id="H"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <button onclick="shuffleSeats()">자리 재배치하기</button>
+
+    <script>
+        const students = [
+            "신지원", "남기정", "변영찬", "김윤군", "이지안", 
+            "김준성", "김주연", "공정배", "이유랑", 
+            "노정운", "장수빈", "박호정", "조진희"
+        ];
+
+        /* 좌석 ID 전체 */
+        const seatOrder = ["A","B","C","D","E","F","G","H","R1","R2","R3","R4","R5"];
+
+        function shuffleSeats() {
+            const shuffled = [...students].sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < seatOrder.length; i++) {
+                const seatId = seatOrder[i];
+                document.getElementById(seatId).innerText = shuffled[i];
+            }
+        }
+
+        /* 페이지 열릴 때 자동 배치 */
+        shuffleSeats();
+    </script>
+
+</body>
+</html>

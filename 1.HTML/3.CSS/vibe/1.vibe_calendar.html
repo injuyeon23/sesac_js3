@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Calendar</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        /* 상단 사진 스타일 */
+        .photo {
+            width: 100%;      /* 가로 꽉 채우기 */
+            height: 320px;    /* 높이 고정 */
+            object-fit: cover;/* 비율 유지하면서 꽉 채우기 */
+            display: block;
+        }
+
+        /* 달력 표 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 15px;
+            width: 14.28%; /* 7칸 균등 */
+            font-size: 18px;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        /* 일요일 빨간색 */
+        th:first-child,
+        td:first-child {
+            color: red;
+        }
+
+        /* 토요일 파란색 */
+        th:last-child,
+        td:last-child {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Photo Calendar</h1>
+    <h2>2025년 12월</h2>
+
+    <!-- 유럽 크리스마스 풍경 (Pexels 무료 사진) -->
+    <img
+        class="photo"
+        src="https://images.pexels.com/photos/14665559/pexels-photo-14665559.jpeg?cs=srgb&dl=pexels-victorphotography-14665559.jpg&fm=jpg"
+        alt="유럽 크리스마스 마켓 전경"
+    >
+
+    <!-- 2025년 12월 달력 -->
+    <table>
+        <tr>
+            <th>Sun</th>
+            <th>Mon</th>
+            <th>Tue</th>
+            <th>Wed</th>
+            <th>Thu</th>
+            <th>Fri</th>
+            <th>Sat</th>
+        </tr>
+        <tr>
+            <td></td>
+            <td>1</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>5</td>
+            <td>6</td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td>8</td>
+            <td>9</td>
+            <td>10</td>
+            <td>11</td>
+            <td>12</td>
+            <td>13</td>
+        </tr>
+        <tr>
+            <td>14</td>
+            <td>15</td>
+            <td>16</td>
+            <td>17</td>
+            <td>18</td>
+            <td>19</td>
+            <td>20</td>
+        </tr>
+        <tr>
+            <td>21</td>
+            <td>22</td>
+            <td>23</td>
+            <td>24</td>
+            <td>25</td>
+            <td>26</td>
+            <td>27</td>
+        </tr>
+        <tr>
+            <td>28</td>
+            <td>29</td>
+            <td>30</td>
+            <td>31</td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+    </table>
+
+</body>
+</html>

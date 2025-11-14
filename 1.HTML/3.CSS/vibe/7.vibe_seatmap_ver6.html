@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>Vibe Seating Chart</title>
+
+    <style>
+        :root {
+            --bg: #f4f6fb;
+            --card: #ffffff;
+            --accent: #4a90e2;
+            --accent-light: #e5f1ff;
+            --group-bg: #fff7dd;
+            --text-main: #222222;
+            --text-sub: #666666;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                system-ui, sans-serif;
+            background: radial-gradient(circle at top, #e9f0ff 0, #f4f6fb 45%, #eef2f8 100%);
+            display: flex;
+            justify-content: center;
+            padding: 40px 16px;
+            color: var(--text-main);
+        }
+
+        .app {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: 0 18px 40px rgba(15, 35, 95, 0.12);
+            padding: 28px 26px 32px;
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .app-title {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            margin: 0 0 6px;
+        }
+
+        .app-subtitle {
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        /* 주간 선택 */
+        .week-selector {
+            margin: 20px auto 24px;
+            max-width: 360px;
+        }
+
+        .week-label {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-sub);
+        }
+
+        .week-select-wrapper { position: relative; }
+
+        select {
+            width: 100%;
+            padding: 10px 40px 10px 14px;
+            font-size: 14px;
+            border-radius: 12px;
+            border: 1px solid #d3d8e6;
+            background: #f9fbff;
+            outline: none;
+            appearance: none;
+            box-shadow: 0 4px 10px rgba(34, 71, 140, 0.08);
+        }
+
+        select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(74,144,226,.2);
+        }
+
+        .week-select-wrapper::after {
+            content: "▾";
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: var(--text-sub);
+            pointer-events: none;
+        }
+
+        /* 강사님 박스 */
+        .teacher { display: flex; justify-content: center; margin-bottom: 24px; }
+
+        .teacher-card {
+            padding: 10px 34px;
+            border-radius: 999px;
+            border: 1px solid #d1d5e5;
+            background: linear-gradient(135deg,#fdfdfd,#f3f6ff);
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 6px 16px rgba(44, 62, 120, 0.12);
+        }
+
+        /* 자리 배치 */
+        .classroom {
+            display: flex;
+            gap: 60px;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            padding: 18px 10px 10px;
+        }
+
+        /* 모둠 */
+        .groups { display: flex; flex-direction: column; gap: 20px; }
+
+        .group-box {
+            border-radius: 18px;
+            padding: 14px;
+            background: var(--group-bg);
+            border: 1px solid #e3d8aa;
+            box-shadow: 0 10px 20px rgba(154,119,35,0.15);
+            min-width: 230px;
+        }
+
+        .group-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+        }
+
+        .group-row { display: flex; gap: 10px; margin-bottom: 8px; }
+        .group-row:last-child { margin-bottom: 0; }
+
+        .group-seat { flex: 1; }
+
+        /* 오른쪽 줄 */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+            min-width: 120px;
+        }
+
+        .column-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-sub);
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        /* 공통 좌석 카드 */
+        .seat, .group-seat {
+            height: 48px;
+            border-radius: 12px;
+            border: 1px solid #c7d1ea;
+            background: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(23, 43, 77, 0.08);
+            transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+            white-space: nowrap;
+        }
+
+        .seat { background: var(--accent-light); }
+
+        .seat:hover, .group-seat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(23, 43, 77, 0.16);
+        }
+
+        /* 버튼 그룹 */
+        .btn-group {
+            margin-top: 26px;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .btn {
+            padding: 11px 22px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            color: #fff;
+        }
+
+        .save-btn { background: #6c5ce7; box-shadow: 0 10px 20px rgba(108,92,231,.25); }
+        .random-btn { background: #4a90e2; box-shadow: 0 10px 20px rgba(74,144,226,.25); }
+        .pdf-btn { background: #00b894; box-shadow: 0 10px 20px rgba(0,184,148,.25); }
+
+    </style>
+</head>
+
+<body>
+<div class="app">
+    <div class="app-header">
+        <h1 class="app-title">새싹 웹개발 반 자동 자리배치표</h1>
+        <div class="app-subtitle">주간별 자리 기록 + 랜덤 배치 + PDF 다운로드</div>
+    </div>
+
+    <!-- 주간 선택 -->
+    <div class="week-selector">
+        <div class="week-label">주간 선택</div>
+        <div class="week-select-wrapper">
+            <select id="weekSelect" onchange="loadWeek()"></select>
+        </div>
+    </div>
+
+    <!-- 강사님 -->
+    <div class="teacher">
+        <div class="teacher-card">강사님 + 화면</div>
+    </div>
+
+    <!-- 자리배치 -->
+    <div class="classroom">
+
+        <div class="groups">
+            <div class="group-box">
+                <div class="group-title">앞 모둠</div>
+                <div class="group-row">
+                    <div class="group-seat" id="A"></div>
+                    <div class="group-seat" id="B"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="C"></div>
+                    <div class="group-seat" id="D"></div>
+                </div>
+            </div>
+
+            <div class="group-box">
+                <div class="group-title">뒤 모둠</div>
+                <div class="group-row">
+                    <div class="group-seat" id="E"></div>
+                    <div class="group-seat" id="F"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="G"></div>
+                    <div class="group-seat" id="H"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="column-title">오른쪽 줄</div>
+            <div class="seat" id="R1"></div>
+            <div class="seat" id="R2"></div>
+            <div class="seat" id="R3"></div>
+            <div class="seat" id="R4"></div>
+            <div class="seat" id="R5"></div>
+        </div>
+    </div>
+
+    <!-- 버튼들 -->
+    <div class="btn-group">
+        <button class="btn save-btn" onclick="manualSave()">현재 자리 저장하기</button>
+        <button class="btn random-btn" onclick="showRandom()">랜덤 배치 보기</button>
+        <button class="btn pdf-btn" onclick="downloadPDF()">PDF 다운로드</button>
+    </div>
+</div>
+
+<!-- PDF 라이브러리 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+    const students = [
+        "신지원","남기정","변영찬","김윤군","이지안",
+        "김준성","김주연","공정배","이유랑",
+        "노정운","장수빈","박호정","조진희"
+    ];
+    const seatOrder = ["A","B","C","D","E","F","G","H","R1","R2","R3","R4","R5"];
+
+    /* 날짜 포맷 */
+    function f(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth()+1).padStart(2,"0");
+        const d = String(date.getDate()).padStart(2,"0");
+        return `${y}-${m}-${d}`;
+    }
+
+    /* 주간 리스트 생성 */
+    function generateWeeks() {
+        let start = new Date("2025-11-17");
+        const end = new Date("2026-02-28");
+        const weeks = [];
+
+        while (start <= end) {
+            const monday = new Date(start);
+            const sunday = new Date(start);
+            sunday.setDate(sunday.getDate() + 6);
+
+            weeks.push({
+                key: f(monday),
+                label: `${f(monday)} ~ ${f(sunday)}`
+            });
+
+            start.setDate(start.getDate() + 7);
+        }
+        return weeks;
+    }
+
+    const weekSelect = document.getElementById("weekSelect");
+    const allWeeks = generateWeeks();
+
+    /* 드롭다운 채우기 */
+    allWeeks.forEach(w => {
+        const opt = document.createElement("option");
+        opt.value = w.key;
+        opt.textContent = w.label;
+        weekSelect.appendChild(opt);
+    });
+
+    function generateRandomSeats() {
+        return [...students].sort(() => Math.random() - 0.5);
+    }
+
+    function saveWeek(week, seats) {
+        let db = JSON.parse(localStorage.getItem("weeklySeats") || "{}");
+        db[week] = seats;
+        localStorage.setItem("weeklySeats", JSON.stringify(db));
+    }
+
+    function fillSeats(list) {
+        seatOrder.forEach((id, i) => {
+            document.getElementById(id).innerText = list[i];
+        });
+    }
+
+    /* 주차 불러오기 */
+    function loadWeek() {
+        const week = weekSelect.value;
+        if (week === "random") return;
+
+        let db = JSON.parse(localStorage.getItem("weeklySeats") || "{}");
+
+        if (!db[week]) {
+            db[week] = generateRandomSeats();
+            saveWeek(week, db[week]);
+        }
+
+        fillSeats(db[week]);
+    }
+
+    /* 수동 저장 */
+    function getCurrentSeats() {
+        return seatOrder.map(id => document.getElementById(id).innerText);
+    }
+
+    function manualSave() {
+        const week = weekSelect.value;
+
+        if (week === "random") {
+            alert("랜덤 모드는 저장할 수 없음!");
+            return;
+        }
+
+        const seats = getCurrentSeats();
+        saveWeek(week, seats);
+        alert(`${week} 주 자리배치가 저장됨!`);
+    }
+
+    /* 랜덤 보기 */
+    function showRandom() {
+        const randomSeats = generateRandomSeats();
+        fillSeats(randomSeats);
+
+        let opt = document.getElementById("randomOpt");
+        if (!opt) {
+            opt = document.createElement("option");
+            opt.id = "randomOpt";
+            opt.value = "random";
+            opt.textContent = "Random (저장 안 됨)";
+            weekSelect.appendChild(opt);
+        }
+        weekSelect.value = "random";
+    }
+
+    /* PDF 다운로드 */
+    async function downloadPDF() {
+        const { jsPDF } = window.jspdf;
+        const element = document.querySelector(".classroom");
+
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const imgWidth = pageWidth - 40;
+        const imgHeight = canvas.height * (imgWidth / canvas.width);
+
+        pdf.addImage(imgData, "PNG", 20, 20, imgWidth, imgHeight);
+        pdf.save(`자리배치표_${weekSelect.value}.pdf`);
+    }
+
+    /* 기본: 첫 주 선택 */
+    weekSelect.value = allWeeks[0].key;
+    loadWeek();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>Vibe Seating Chart</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { 
+            margin-bottom: 10px;
+        }
+
+        /* 강사님 */
+        .teacher {
+            border: 2px solid #000;
+            padding: 12px 40px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        /* 주차 선택 */
+        .week-selector {
+            margin-bottom: 25px;
+            width: 330px;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+        }
+
+        /* 전체 배치 */
+        .classroom {
+            display: flex;
+            gap: 80px;
+            margin: 25px 0;
+        }
+
+        /* 오른쪽 좌석 */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 360px;
+        }
+
+        .seat {
+            width: 90px;
+            height: 48px;
+            border: 1px solid #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #e5f3ff;
+            border-radius: 6px;
+        }
+
+        /* 왼쪽 모둠 */
+        .groups {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .group-box {
+            border: 2px solid #777;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            background: #fff9e6;
+        }
+
+        .group-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 7px;
+        }
+
+        .group-seat {
+            width: 90px;
+            height: 48px;
+            border: 1px solid #222;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+        }
+
+        /* 랜덤 버튼 */
+        .random-btn {
+            margin-top: 30px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>새싹 웹개발 반 자동 자리배치표</h1>
+
+    <!-- [1번 수정사항] 날짜 선택을 가장 위로 -->
+    <div class="week-selector">
+        <select id="weekSelect" onchange="loadWeek()"></select>
+    </div>
+
+    <!-- 강사님 상자 -->
+    <div class="teacher">강사님 + 화면</div>
+
+    <!-- 좌석 구조 -->
+    <div class="classroom">
+
+        <!-- 왼쪽 모둠 -->
+        <div class="groups">
+
+            <!-- 앞 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="A"></div>
+                    <div class="group-seat" id="B"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="C"></div>
+                    <div class="group-seat" id="D"></div>
+                </div>
+            </div>
+
+            <!-- 뒤 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="E"></div>
+                    <div class="group-seat" id="F"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="G"></div>
+                    <div class="group-seat" id="H"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 오른쪽 줄 5석 -->
+        <div class="right-column">
+            <div class="seat" id="R1"></div>
+            <div class="seat" id="R2"></div>
+            <div class="seat" id="R3"></div>
+            <div class="seat" id="R4"></div>
+            <div class="seat" id="R5"></div>
+        </div>
+    </div>
+
+    <!-- [2번 수정사항] 랜덤 보기 버튼 -->
+    <button class="random-btn" onclick="showRandom()">랜덤 배치 보기</button>
+
+    <script>
+        const students = [
+            "신지원","남기정","변영찬","김윤군","이지안",
+            "김준성","김주연","공정배","이유랑",
+            "노정운","장수빈","박호정","조진희"
+        ];
+
+        const seatOrder = ["A","B","C","D","E","F","G","H","R1","R2","R3","R4","R5"];
+
+        /* 날짜 포맷 */
+        function f(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth()+1).padStart(2,"0");
+            const d = String(date.getDate()).padStart(2,"0");
+            return `${y}-${m}-${d}`;
+        }
+
+        /* 주간 리스트 생성 */
+        function generateWeeks() {
+            let start = new Date("2025-11-17");
+            const end = new Date("2026-02-28");
+            const weeks = [];
+
+            while (start <= end) {
+                const monday = new Date(start);
+                const sunday = new Date(start);
+                sunday.setDate(sunday.getDate() + 6);
+
+                weeks.push({
+                    key: f(monday),
+                    label: `${f(monday)} ~ ${f(sunday)}`
+                });
+
+                start.setDate(start.getDate() + 7);
+            }
+            return weeks;
+        }
+
+        const weekSelect = document.getElementById("weekSelect");
+        const allWeeks = generateWeeks();
+
+        /* select 채우기 */
+        allWeeks.forEach(w => {
+            const opt = document.createElement("option");
+            opt.value = w.key;
+            opt.textContent = w.label;
+            weekSelect.appendChild(opt);
+        });
+
+        /* 랜덤 자리 생성 */
+        function generateRandomSeats() {
+            return [...students].sort(() => Math.random() - 0.5);
+        }
+
+        /* 주차별 저장 */
+        function saveWeek(week, seats) {
+            let db = JSON.parse(localStorage.getItem("weeklySeats") || "{}");
+            db[week] = seats;
+            localStorage.setItem("weeklySeats", JSON.stringify(db));
+        }
+
+        /* 주차 불러오기 */
+        function loadWeek() {
+            const week = weekSelect.value;
+
+            if (week === "random") return;
+
+            let db = JSON.parse(localStorage.getItem("weeklySeats") || "{}");
+
+            /* 없으면 생성 */
+            if (!db[week]) {
+                db[week] = generateRandomSeats();
+                saveWeek(week, db[week]);
+            }
+
+            fillSeats(db[week]);
+        }
+
+        /* 자리 채우기 */
+        function fillSeats(list) {
+            seatOrder.forEach((id, i) => {
+                document.getElementById(id).innerText = list[i];
+            });
+        }
+
+        /* [2번 기능] 랜덤 보기 */
+        function showRandom() {
+            const randomSeats = generateRandomSeats();
+
+            fillSeats(randomSeats);
+
+            /* 드롭다운 표시 → random */
+            let opt = document.getElementById("randomOpt");
+            if (!opt) {
+                opt = document.createElement("option");
+                opt.id = "randomOpt";
+                opt.value = "random";
+                opt.textContent = "Random";
+                weekSelect.appendChild(opt);
+            }
+            weekSelect.value = "random";
+        }
+
+        /* 기본 = 첫 주 자동 선택 */
+        weekSelect.value = allWeeks[0].key;
+        loadWeek();
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>Vibe Seating Chart</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        /* 강사님 영역 */
+        .teacher {
+            border: 2px solid #000;
+            padding: 12px 40px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .date-label {
+            margin-bottom: 25px;
+            font-size: 16px;
+        }
+
+        /* 전체 자리 배치 (좌: 모둠, 우: 줄 5석) */
+        .classroom {
+            display: flex;
+            gap: 80px;
+            margin-bottom: 20px;
+        }
+
+        /* 오른쪽 5좌석 */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 360px;
+        }
+
+        .seat {
+            width: 90px;
+            height: 48px;
+            border: 1px solid #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #e5f3ff;
+            border-radius: 6px;
+        }
+
+        /* 왼쪽 모둠 그룹 */
+        .groups {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .group-box {
+            border: 2px solid #777;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            background: #fff9e6;
+        }
+
+        .group-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 7px;
+        }
+
+        .group-seat {
+            width: 90px;
+            height: 48px;
+            border: 1px solid #222;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+        }
+
+        /* 버튼 */
+        button {
+            margin-top: 20px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* 기록 영역 */
+        .history-title {
+            margin-top: 35px;
+            font-size: 20px;
+        }
+
+        .history-box {
+            width: 600px;
+            border: 1px solid #999;
+            padding: 15px;
+            margin-top: 10px;
+            background: #fafafa;
+            border-radius: 10px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .record {
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>새싹 웹개발 반 자동 자리배치표</h1>
+
+    <div class="teacher">강사님 + 화면</div>
+
+    <div class="date-label" id="today"></div>
+
+    <!-- 좌우 자리배치: 왼쪽 모둠 / 오른쪽 줄 5석 -->
+    <div class="classroom">
+
+        <!-- 왼쪽: 모둠 2개 -->
+        <div class="groups">
+
+            <!-- 앞 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="A"></div>
+                    <div class="group-seat" id="B"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="C"></div>
+                    <div class="group-seat" id="D"></div>
+                </div>
+            </div>
+
+            <!-- 뒤 모둠 -->
+            <div class="group-box">
+                <div class="group-row">
+                    <div class="group-seat" id="E"></div>
+                    <div class="group-seat" id="F"></div>
+                </div>
+                <div class="group-row">
+                    <div class="group-seat" id="G"></div>
+                    <div class="group-seat" id="H"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 오른쪽: 세로 줄 5석 -->
+        <div class="right-column">
+            <div class="seat" id="R1"></div>
+            <div class="seat" id="R2"></div>
+            <div class="seat" id="R3"></div>
+            <div class="seat" id="R4"></div>
+            <div class="seat" id="R5"></div>
+        </div>
+
+    </div>
+
+    <button onclick="shuffleSeats()">자리 재배치하기</button>
+
+    <h2 class="history-title">자리배치 기록</h2>
+    <div class="history-box" id="history"></div>
+
+    <script>
+        const students = [
+            "신지원", "남기정", "변영찬", "김윤군", "이지안",
+            "김준성", "김주연", "공정배", "이유랑",
+            "노정운", "장수빈", "박호정", "조진희"
+        ];
+
+        const seatOrder = ["A","B","C","D","E","F","G","H","R1","R2","R3","R4","R5"];
+
+        function getToday() {
+            const d = new Date();
+            return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+        }
+
+        document.getElementById("today").innerText = "오늘 날짜: " + getToday();
+
+        function shuffleSeats() {
+            const shuffled = [...students].sort(() => Math.random() - 0.5);
+
+            seatOrder.forEach((id, i) => {
+                document.getElementById(id).innerText = shuffled[i];
+            });
+
+            saveHistory(shuffled);
+        }
+
+        function saveHistory(list) {
+            let history = JSON.parse(localStorage.getItem("seatHistory") || "[]");
+
+            const record = {
+                date: getToday(),
+                seats: {}
+            };
+
+            seatOrder.forEach((id, i) => {
+                record.seats[id] = list[i];
+            });
+
+            history.push(record);
+            localStorage.setItem("seatHistory", JSON.stringify(history));
+
+            showHistory();
+        }
+
+        function showHistory() {
+            const history = JSON.parse(localStorage.getItem("seatHistory") || "[]");
+            const box = document.getElementById("history");
+            box.innerHTML = "";
+
+            history.forEach((rec) => {
+                const div = document.createElement("div");
+                div.className = "record";
+
+                div.innerHTML = `
+                    <strong>${rec.date}</strong><br>
+                    ${Object.entries(rec.seats)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join("<br>")}
+                `;
+
+                box.appendChild(div);
+            });
+        }
+
+        showHistory();
+        shuffleSeats();
+    </script>
+
+</body>
+</html>
