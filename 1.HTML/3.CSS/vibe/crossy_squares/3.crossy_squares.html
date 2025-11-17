@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>길건너 친구들 · 픽셀 완성 리팩토링</title>
+
+<style>
+/* ===================== 전역 레이아웃 ===================== */
+/* 전체 화면을 480px 모바일 게임기처럼 고정 */
+html, body {
+  padding: 0;
+  margin: 0;
+  background: #0b0b0b;
+  overflow-x: hidden;
+}
+
+body {
+  width: 480px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: ui-sans-serif, system-ui, Apple SD Gothic Neo, Roboto;
+  color: #f2f2f2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 공통 패널 스타일 */
+.panel {
+  width: 100%;
+  background: #1c1c1c;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  margin-top: 12px;
+}
+
+.title {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.small {
+  opacity: .85;
+  font-size: 13px;
+}
+
+.btn {
+  padding: 12px;
+  width: 100%;
+  font-size: 16px;
+  border-radius: 12px;
+  border: 1px solid #3a3a3a;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+}
+.btn:hover {
+  background: #2c2c2c;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 캐릭터 선택 */
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.char {
+  background: #161616;
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.char.selected {
+  border-color: #42b983;
+  box-shadow: 0 0 10px rgba(66,185,131,.4);
+}
+
+/* 게임 화면 */
+canvas {
+  width: 100%;
+  height: 720px;
+  background: #121212;
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+/* 터치 패드 */
+.pad {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.pad button {
+  width: 100%;
+  height: 70px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  background: #171717;
+  color: #eee;
+  font-size: 20px;
+}
+.pad button:active {
+  transform: scale(.97);
+}
+</style>
+</head>
+
+<body>
+  <div class="panel">
+    <div class="title">길건너 친구들 · 픽셀 버전</div>
+    <div class="small">방향키 + 터치패드 지원 · 난이도 자동 상승 · 사운드 포함</div>
+  </div>
+
+  <!-- 캐릭터 선택 -->
+  <div class="panel" id="selectPanel">
+    <div class="title">캐릭터 선택</div>
+    <div class="small">* 실제 픽셀 스프라이트 적용됨</div>
+    <div class="char-grid" id="chars"></div>
+    <button class="btn" id="startBtn">게임 시작</button>
+  </div>
+
+  <!-- 게임 패널 -->
+  <div class="panel">
+    <canvas id="game" width="480" height="720"></canvas>
+
+    <div class="row" style="margin-top:12px;">
+      <div>점수: <b id="score">0</b></div>
+      <div>레벨: <b id="level">1</b></div>
+      <div>상태: <b id="status">대기중</b></div>
+    </div>
+    <button class="btn" id="restartBtn" style="margin-top:10px">다시 시작</button>
+  </div>
+
+  <!-- 터치 패드 -->
+  <div class="panel">
+    <div class="title">터치 패드</div>
+    <div class="pad">
+      <div></div>
+      <button id="btnUp">▲</button>
+      <div></div>
+      <button id="btnLeft">◀</button>
+      <button id="btnDown">▼</button>
+      <button id="btnRight">▶</button>
+    </div>
+  </div>
+
+<script>
+/* ==========================================================
+   리팩토링 버전: 픽셀 게임 전체 로직
+   ========================================================== */
+
+/* ===== 기본 GRID ===== */
+const W=480, H=720, CELL=48, COLS=10, ROWS=15;
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+ctx.imageSmoothingEnabled=false;
+
+const scoreEl=document.getElementById("score");
+const levelEl=document.getElementById("level");
+const statusEl=document.getElementById("status");
+
+let running=false, gameOver=false, lastTime=0;
+let score=0, level=1, elapsed=0, diffFactor=1;
+
+/* ===== 픽셀 스프라이트 ===== */
+const SPRITES = {
+  tiger:{
+    palette:[null,"#000","#ff9a28","#ffd079","#fff"],
+    pix:(()=>{let a=Array(256).fill(0);
+      for(let r=3;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=3;
+      a[2*16+4]=3; a[2*16+11]=3;
+      a[7*16+6]=1; a[7*16+9]=1;
+      a[9*16+7]=1; a[9*16+8]=1; a[10*16+8]=1;
+      a[5*16+4]=1; a[5*16+11]=1;
+      return a; })()
+  },
+  rabbit:{
+    palette:[null,"#000","#eee","#ff9ac4"],
+    pix:(()=>{let a=Array(256).fill(0);
+      for(let r=4;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      for(let r=0;r<4;r++){a[r*16+5]=2; a[r*16+10]=2;}
+      a[7*16+6]=1; a[7*16+9]=1;
+      return a;})()
+  },
+  cat:{
+    palette:[null,"#000","#b48cff","#fff"],
+    pix:(()=>{let a=Array(256).fill(0);
+      for(let r=3;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      a[7*16+6]=1; a[7*16+9]=1;
+      return a;})()
+  },
+  dog:{
+    palette:[null,"#000","#8bd3ff","#fff"],
+    pix:(()=>{let a=Array(256).fill(0);
+      for(let r=4;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      a[7*16+6]=1; a[7*16+9]=1;
+      return a;})()
+  },
+  coin:{
+    palette:[null,"#000","#ffd84d","#ffea94","#8a6f00"],
+    pix:(()=>{let a=Array(256).fill(0);
+      for(let r=4;r<12;r++)for(let c=4;c<12;c++)a[r*16+c]=2;
+      return a;})()
+  }
+};
+
+/* ===== 스프라이트 출력 함수 ===== */
+function drawSprite(pix, palette, x, y, scale=2){
+  for(let i=0;i<256;i++){
+    const col=i%16, row=(i/16|0);
+    const idx=pix[i];
+    if(idx===0) continue;
+    ctx.fillStyle=palette[idx];
+    ctx.fillRect(x+col*scale, y+row*scale, scale, scale);
+  }
+}
+
+/* ===== 캐릭터 선택 ===== */
+const CHAR_LIST=[
+  {key:"tiger", name:"호랑이"},
+  {key:"rabbit", name:"토끼"},
+  {key:"cat", name:"고양이"},
+  {key:"dog", name:"강아지"},
+];
+
+let chosen="tiger";
+const charsWrap=document.getElementById("chars");
+CHAR_LIST.forEach(c=>{
+  const box=document.createElement("div");
+  box.className="char" + (c.key===chosen ? " selected":"");
+  box.dataset.key=c.key;
+  box.innerHTML=`<div><b>${c.name}</b></div><div class="small">${c.key}</div>`;
+  box.addEventListener("click",()=>{
+    chosen=c.key;
+    [...charsWrap.children].forEach(x=>x.classList.remove("selected"));
+    box.classList.add("selected");
+  });
+  charsWrap.appendChild(box);
+});
+
+/* ===== 플레이어 ===== */
+let player={col:5, row:14, sprite:"tiger"};
+
+/* ===== 장애물 / 기차 / 코인 ===== */
+let obstacles=[], trains=[], coins=[];
+
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function randint(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+/* ===== 오디오 초기화 ===== */
+let audioCtx;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+}
+function beep({freq=440,dur=0.1,vol=0.1}){
+  if(!audioCtx) return;
+  const t=audioCtx.currentTime;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.start(t); o.stop(t+dur);
+}
+
+function playJump(){ beep({freq:600,dur:0.1,vol:0.12}); }
+function playCoinSound(){ beep({freq:900,dur:0.1,vol:0.15}); }
+function playHit(){ beep({freq:200,dur:0.2,vol:0.2}); }
+
+/* ===== 월드 빌드 ===== */
+function buildWorld(){
+  obstacles=[];
+  trains=[];
+  coins=[];
+
+  for(let r=3;r<=11;r++){
+    const isCar=r%2===1;
+    const count=randint(2,3);
+
+    for(let i=0;i<count;i++){
+      const y=r*CELL;
+      const x=rand(0,W);
+      const speed=(isCar?rand(60,120):-rand(40,90));
+      obstacles.push({x,y,w:CELL*2,h:CELL,speedX:speed,type:isCar?"car":"log"});
+    }
+  }
+
+  [5,9].forEach(r=>{
+    trains.push({x:-600,y:r*CELL,w:CELL*4,h:CELL,speedX:360,cooldown:rand(1.5,3)});
+  });
+
+  for(let i=0;i<5;i++) spawnCoin();
+}
+
+function spawnCoin(){
+  for(let t=0;t<20;t++){
+    const col=randint(0,COLS-1), row=randint(0,ROWS-3);
+    coins.push({col,row,active:true});
+    return;
+  }
+}
+
+/* ===== 이동 / 충돌 ===== */
+function tryMove(dx,dy){
+  if(gameOver) return;
+  const nc=player.col+dx, nr=player.row+dy;
+  if(nc<0 || nc>=COLS || nr<0 || nr>=ROWS) return;
+  player.col=nc; player.row=nr;
+  if(dy===-1){ score++; playJump(); scoreEl.textContent=score; }
+  collectCoin();
+}
+
+function collectCoin(){
+  for(let c of coins){
+    if(c.active && c.col===player.col && c.row===player.row){
+      c.active=false;
+      score+=10;
+      scoreEl.textContent=score;
+      playCoinSound();
+    }
+  }
+}
+
+/* ===== 난이도 상승 ===== */
+function updateDifficulty(dt){
+  elapsed+=dt;
+  const newLevel=Math.floor(elapsed/12)+1;
+  if(newLevel !== level){
+    level=newLevel;
+    diffFactor = Math.min(1+level*0.2, 3);
+    levelEl.textContent=level;
+  }
+}
+
+/* ===== 충돌판정 ===== */
+function hitPlayer(){
+  const px=player.col*CELL, py=player.row*CELL;
+  const pr={x:px,y:py,w:CELL,h:CELL};
+  function rect(a,b){
+    return !(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
+  }
+  for(let o of obstacles) if(rect(pr,o)) return true;
+  for(let t of trains) if(rect(pr,t)) return true;
+  return false;
+}
+
+/* ===== 게임 루프 ===== */
+function update(dt){
+  updateDifficulty(dt);
+
+  for(let o of obstacles){
+    o.x += o.speedX*dt*diffFactor;
+    if(o.speedX>0 && o.x>W) o.x=-o.w;
+    if(o.speedX<0 && o.x<-o.w) o.x=W;
+  }
+
+  for(let tr of trains){
+    tr.cooldown -= dt;
+    if(tr.cooldown<=0){
+      tr.x += tr.speedX*dt*diffFactor;
+      if(tr.x>W+400){
+        tr.x=-600;
+        tr.cooldown=rand(2,3);
+      }
+    }
+  }
+
+  if(hitPlayer()){
+    playHit();
+    gameOver=true;
+    running=false;
+    statusEl.textContent="게임오버";
+  }
+}
+
+function draw(){
+  ctx.fillStyle="#101010";
+  ctx.fillRect(0,0,W,H);
+
+  for(let r=3;r<=11;r++){
+    ctx.fillStyle=r%2===1?"rgba(255,80,80,0.07)":"rgba(120,180,255,0.07)";
+    ctx.fillRect(0,r*CELL,W,CELL);
+  }
+
+  for(let c of coins){
+    if(c.active){
+      drawSprite(SPRITES.coin.pix, SPRITES.coin.palette, c.col*CELL+8, c.row*CELL+8, 2);
+    }
+  }
+
+  const S=SPRITES[player.sprite];
+  drawSprite(S.pix, S.palette, player.col*CELL+8, player.row*CELL+8, 2);
+
+  if(gameOver){
+    ctx.fillStyle="rgba(0,0,0,0.5)";
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#fff";
+    ctx.font="bold 28px sans-serif";
+    ctx.fillText("게임오버", W/2-70, H/2);
+  }
+}
+
+function loop(ts){
+  const dt = Math.min(0.033, (ts-lastTime)/1000 || 0);
+  lastTime=ts;
+
+  if(running && !gameOver) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ===== 버튼 / 시작 ===== */
+document.getElementById("startBtn").onclick=()=>{
+  player.sprite=chosen;
+  ensureAudio();
+  document.getElementById("selectPanel").style.display="none";
+  restartGame();
+};
+
+document.getElementById("restartBtn").onclick=()=>{
+  ensureAudio();
+  restartGame();
+};
+
+function restartGame(){
+  score=0; elapsed=0; level=1; diffFactor=1;
+  player.col=5; player.row=14;
+  buildWorld();
+  running=true; gameOver=false;
+  statusEl.textContent="플레이중";
+  scoreEl.textContent=0;
+  levelEl.textContent=1;
+}
+
+/* ===== 키보드 이동 ===== */
+window.addEventListener("keydown",(e)=>{
+  if(!running) return;
+  if(e.key==="ArrowUp") tryMove(0,-1);
+  if(e.key==="ArrowDown") tryMove(0,1);
+  if(e.key==="ArrowLeft") tryMove(-1,0);
+  if(e.key==="ArrowRight") tryMove(1,0);
+});
+
+/* ===== 터치패드 ===== */
+const pad = {
+  btnUp:()=>tryMove(0,-1),
+  btnDown:()=>tryMove(0,1),
+  btnLeft:()=>tryMove(-1,0),
+  btnRight:()=>tryMove(1,0),
+};
+
+["btnUp","btnDown","btnLeft","btnRight"].forEach(id=>{
+  document.getElementById(id).onclick=pad[id];
+});
+</script>
+
+</body>
+</html>

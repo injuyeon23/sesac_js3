@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=480, initial-scale=1"/>
+<title>길건너 스타일 · 오리지널 픽셀</title>
+<style>
+:root{ --w:480px; --h:720px; --ui:#151515; --text:#ececec; --accent:#42b983; }
+*{box-sizing:border-box}
+html,body{margin:0;background:#0b0b0b;overflow:hidden}
+body{width:480px;max-width:480px;margin:0 auto;color:var(--text);font-family:ui-sans-serif,system-ui,Apple SD Gothic Neo,Segoe UI,Roboto}
+.panel{width:var(--w);background:var(--ui);margin:12px 0;padding:12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.title{font-weight:800}
+.badge{padding:4px 8px;border:1px solid #2e2e2e;border-radius:999px;background:#111;font-size:12px;margin-left:6px;opacity:.9}
+canvas{display:block;width:var(--w);height:var(--h);background:#0e0e0e;border-radius:10px;outline:1px solid #232323}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.btn{padding:10px 12px;border-radius:10px;border:1px solid #3a3a3a;background:#1d1d1d;color:#fff;cursor:pointer}
+.btn:hover{background:#242424}
+.small{opacity:.85;font-size:12px}
+.char-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.char{border:2px solid #333;border-radius:10px;padding:8px;background:#121212;text-align:center;cursor:pointer}
+.char.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(66,185,131,.25)}
+.pad{width:var(--w);display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:10px}
+.pad button{height:70px;border-radius:12px;border:1px solid #3a3a3a;background:#171717;color:#eee;font-size:20px}
+.pad button:active{transform:scale(.98)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="row">
+      <div class="title">오리지널 크로시 스타일 · 픽셀</div>
+      <div class="row">
+        <span class="badge">방향키/터치 이동</span>
+        <span class="badge">위로 한 칸=+1</span>
+        <span class="badge">코인=+10</span>
+        <span class="badge">충돌=게임오버</span>
+        <span class="badge">난이도 상승</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="selectPanel">
+    <div class="title">캐릭터 선택</div>
+    <div class="small">* 저작권을 피한 오리지널 픽셀 스프라이트 사용</div>
+    <div class="char-grid" id="chars"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="startBtn">게임 시작</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <canvas id="game" width="480" height="720" aria-label="game"></canvas>
+    <div class="row" style="margin-top:8px">
+      <div>점수: <b id="score">0</b></div>
+      <div>레벨: <b id="level">1</b></div>
+      <div>상태: <b id="status">대기중</b></div>
+      <button class="btn" id="restartBtn">다시 시작</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="title">터치 패드</div>
+    <div class="pad">
+      <div></div><button id="btnUp">▲</button><div></div>
+      <button id="btnLeft">◀</button><button id="btnDown">▼</button><button id="btnRight">▶</button>
+    </div>
+  </div>
+
+<script>
+/* =========================================================
+   오리지널 ‘크로시-스타일’ 싱글파일 빌드
+   디자인 강화 포인트:
+   - 배경: 그라데이션 하늘 + 구름 패럴랙스
+   - 타일: 잔디/도로/강(물결 애니메이션) 라인
+   - 이동: 격자 이동을 120ms 트윈(부드러운 한칸 점프)
+   - 스프라이트: 3프레임 워크/대기 & 그림자
+   - 코인: 6프레임 회전, 획득 파티클
+   - 충돌: 카메라 셰이크
+   - 난이도: 12초마다 속도/스폰↑
+========================================================= */
+const W=480,H=720,CELL=48,COLS=W/CELL,ROWS=H/CELL;
+const canvas=document.getElementById('game'); const ctx=canvas.getContext('2d'); ctx.imageSmoothingEnabled=false;
+const scoreEl=document.getElementById('score'), levelEl=document.getElementById('level'), statusEl=document.getElementById('status');
+const restartBtn=document.getElementById('restartBtn'), startBtn=document.getElementById('startBtn');
+const charsWrap=document.getElementById('chars'), selectPanel=document.getElementById('selectPanel');
+
+let running=false, gameOver=false, last=0, elapsed=0, level=1, diff=1, score=0;
+let shakeT=0;
+
+// ======= 간단 오디오(브라우저 자동재생 제한 회피: 시작 버튼 이후 재생) =======
+let actx=null;
+function ensureAudio(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); }
+function tone(freq,dur=0.1,vol=0.12,type='square',when=0){
+  if(!actx) return; const t=actx.currentTime+when; const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t+dur+0.04);
+}
+function sJump(){ tone(720,0.08,0.12,'square'); }
+function sCoin(){ tone(1000,0.06,0.13,'square'); tone(1400,0.06,0.11,'square',0.06); }
+function sHit(){ tone(200,0.18,0.2,'sawtooth'); }
+let bgTimer=null;
+function bgmStart(){ bgmStop(); ensureAudio(); const bpm=112, beat=60/bpm, notes=[220,277,330,392,330,277]; bgTimer=setInterval(()=>{
+  const now=actx.currentTime; notes.forEach((f,i)=>tone(f,beat*0.35,0.05,'triangle',i*beat*0.5));
+}, beat*1000*notes.length*0.5); }
+function bgmStop(){ if(bgTimer){ clearInterval(bgTimer); bgTimer=null; } }
+
+// ======= 유틸 =======
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rand=(a,b)=>Math.random()*(b-a)+a;
+const randint=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+
+// ======= 배경(하늘 그라데이션 + 구름 패럴랙스) =======
+const clouds=[{x:20,y:40,s:50,v:10},{x:200,y:70,s:70,v:14},{x:380,y:30,s:40,v:8}];
+
+// ======= 타일 종류: grass/road/water =======
+const lanes=[];
+for(let r=0;r<ROWS;r++){
+  if(r<3 || r>11) lanes[r]='grass';
+  else lanes[r]= (r%3===0)?'water': (r%2===0?'road':'grass');
+}
+let waterPhase=0, roadStripe=0;
+
+// ======= 스프라이트(16x16 * scale2) - 3프레임 걷기 =======
+function makeSprite(baseColor,accent){
+  // 간단한 동물형 마스크
+  const frames=[];
+  for(let f=0;f<3;f++){
+    const a=Array(16*16).fill(0);
+    // 얼굴
+    for(let r=3;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+    // 귀
+    a[2*16+4]=2; a[2*16+11]=2;
+    // 눈 프레임 이동
+    a[7*16+6+(f===2?1:0)]=1; a[7*16+9-(f===0?1:0)]=1;
+    // 볼터치
+    a[9*16+5]=3; a[9*16+10]=3;
+    frames.push({pix:a, pal:[null,'#000',baseColor,accent]});
+  }
+  return frames;
+}
+const SPR = {
+  tiger: makeSprite('#ff9a28','#ffd079'),
+  rabbit: makeSprite('#f1f1f1','#ff9ac4'),
+  cat:   makeSprite('#b48cff','#e2d2ff'),
+  dog:   makeSprite('#8bd3ff','#cdeeff')
+};
+const COIN_FR = (()=>{
+  const arr=[]; // 6프레임 회전
+  for(let k=0;k<6;k++){
+    const a=Array(256).fill(0);
+    const w=4+Math.abs(3-k)*2; // 얇아졌다 두꺼워짐
+    const off=8-Math.floor(w/2);
+    for(let r=4;r<12;r++)for(let c=off;c<off+w;c++)a[r*16+c]=2;
+    arr.push({pix:a, pal:[null,'#000','#ffd84d']});
+  }
+  return arr;
+})();
+
+function drawSprite(frame,x,y,scale=2){
+  const {pix,pal}=frame;
+  for(let i=0;i<256;i++){
+    const p=pix[i]; if(!p) continue;
+    const cx=i%16, cy=(i/16|0);
+    ctx.fillStyle=pal[p]; ctx.fillRect(x+cx*scale,y+cy*scale,scale,scale);
+  }
+}
+
+// ======= 객체들 =======
+const player={
+  col:Math.floor(COLS/2), row:ROWS-1, tx:0, ty:0, // 타겟 좌표(격자)
+  x:0, y:0, sx:0, sy:0, moving:false, t:0, dur:0.12, dir:'up', fr:0, frT:0,
+  key:'tiger'
+};
+player.tx=player.col; player.ty=player.row; player.x=player.col*CELL; player.y=player.row*CELL; player.sx=player.x; player.sy=player.y;
+
+let obstacles=[]; // {x,y,w,h,type:'car'|'log', vx}
+let trains=[];    // {x,y,w,h,vx,cooldown}
+let coins=[];     // {col,row, active, fr, frT}
+let particles=[]; // {x,y,vx,vy,t}
+
+// ======= 월드 생성 =======
+function build(){
+  obstacles=[]; trains=[]; coins=[]; particles=[];
+  for(let r=3;r<=11;r++){
+    const lane=lanes[r];
+    if(lane==='road'||lane==='water'){
+      const count=randint(2,3);
+      for(let i=0;i<count;i++){
+        const y=r*CELL;
+        const w= CELL*(lane==='road'?2:2), h=CELL, x=rand(0,W);
+        const vx = (lane==='road'? (Math.random()<.5?-1:1)*rand(70,120) : (Math.random()<.5?-1:1)*rand(50,90));
+        obstacles.push({x,y,w,h,vx,type:(lane==='road'?'car':'log')});
+      }
+    }
+  }
+  // 기차 라인 2개
+  [5,9].forEach(r=>trains.push({x:-600,y:r*CELL,w:CELL*4,h:CELL,vx:360,cooldown:rand(1.5,3.5)}));
+  for(let i=0;i<6;i++) spawnCoin();
+}
+function spawnCoin(){
+  for(let t=0;t<25;t++){
+    const c=randint(0,COLS-1), r=randint(0,ROWS-2);
+    if(lanes[r]==='water') continue; // 물 위 코인 제외
+    if(c===player.col && r===player.row) continue;
+    coins.push({col:c,row:r,active:true,fr:0,frT:0});
+    return;
+  }
+}
+
+// ======= 입력(방향키 + 터치) — 1칸 트윈 이동 =======
+function tryMove(dx,dy){
+  if(gameOver||player.moving) return;
+  const nc=clamp(player.col+dx,0,COLS-1), nr=clamp(player.row+dy,0,ROWS-1);
+  if(nc===player.col && nr===player.row) return;
+  player.col=nc; player.row=nr; player.tx=nc; player.ty=nr;
+  player.sx=player.x; player.sy=player.y; player.t=0; player.moving=true;
+  if(dy<0) player.dir='up'; else if(dy>0) player.dir='down'; else if(dx<0) player.dir='left'; else player.dir='right';
+  if(dy<0){ score+=1; scoreEl.textContent=score; sJump(); }
+  // 코인 체크는 도착 시
+}
+window.addEventListener('keydown',e=>{
+  if(!running||gameOver) return;
+  if(e.key==='ArrowUp') tryMove(0,-1);
+  if(e.key==='ArrowDown') tryMove(0,1);
+  if(e.key==='ArrowLeft') tryMove(-1,0);
+  if(e.key==='ArrowRight') tryMove(1,0);
+});
+const padMap={btnUp:[0,-1],btnDown:[0,1],btnLeft:[-1,0],btnRight:[1,0]};
+Object.keys(padMap).forEach(id=>{
+  const [dx,dy]=padMap[id];
+  const go=()=>tryMove(dx,dy);
+  document.getElementById(id).addEventListener('click',go,{passive:true});
+  document.getElementById(id).addEventListener('touchstart',e=>{e.preventDefault();go();},{passive:false});
+});
+
+// ======= 충돌/파티클 =======
+function rectHit(a,b){ return !(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y); }
+function burst(x,y,n=8){
+  for(let i=0;i<n;i++){
+    particles.push({x,y,vx:rand(-90,90),vy:rand(-140,-60),t:0});
+  }
+}
+
+// ======= 난이도 곡선 =======
+function updateDifficulty(dt){
+  elapsed+=dt;
+  const lv=Math.floor(elapsed/12)+1;
+  if(lv!==level){
+    level=lv; diff=Math.min(1+level*0.18,3.2); levelEl.textContent=level;
+    // 가끔 추가 스폰
+    if(Math.random()<0.7){
+      const r=randint(3,11); if(lanes[r]!=='grass'){
+        const y=r*CELL, w=CELL*2,h=CELL, vx=(lanes[r]==='road'?1:-1)*rand(70,120)*diff;
+        obstacles.push({x:(vx>0?-w:W),y,w,h,vx,type:(lanes[r]==='road'?'car':'log')});
+      }
+    }
+  }
+}
+
+// ======= 메인 업데이트 =======
+function update(dt){
+  updateDifficulty(dt);
+  // 배경
+  waterPhase+=dt*2.2; roadStripe+=dt*120;
+  clouds.forEach(c=>{ c.x+=c.v*dt; if(c.x>W+c.s) c.x=-c.s; });
+  if(shakeT>0) shakeT=Math.max(0,shakeT-dt);
+
+  // 장애물
+  for(const o of obstacles){
+    o.x += o.vx*dt*diff;
+    if(o.vx>0 && o.x>W+20) o.x=-o.w;
+    if(o.vx<0 && o.x<-o.w-20) o.x=W;
+  }
+  // 기차
+  for(const tr of trains){
+    tr.cooldown -= dt;
+    if(tr.cooldown<=0){
+      tr.x += tr.vx*dt*diff*1.2;
+      if(tr.x>W+420){ tr.x=-rand(400,700); tr.cooldown=rand(2.0,4.0)/Math.max(1,diff-0.2); }
+    }
+  }
+  // 플레이어 트윈
+  if(player.moving){
+    player.t += dt;
+    const k = Math.min(1, player.t/player.dur); // easeOutQuad
+    const e = 1-(1-k)*(1-k);
+    player.x = lerp(player.sx, player.tx*CELL, e);
+    player.y = lerp(player.sy, player.ty*CELL, e);
+    if(k>=1){ player.moving=false; player.x=player.tx*CELL; player.y=player.ty*CELL; checkCoin(); }
+    // 애니 프레임
+    player.frT += dt; if(player.frT>0.08){ player.fr=(player.fr+1)%3; player.frT=0; }
+  } else {
+    // 대기 프레임 천천히
+    player.frT += dt; if(player.frT>0.2){ player.fr=(player.fr+1)%3; player.frT=0; }
+  }
+
+  // 코인 회전
+  for(const c of coins){ if(!c.active) continue; c.frT+=dt; if(c.frT>0.1){ c.fr=(c.fr+1)%6; c.frT=0; } }
+
+  // 파티클
+  for(const p of particles){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt; }
+  particles = particles.filter(p=>p.t<0.6);
+
+  // 충돌 체크
+  const pr={x:player.x+6,y:player.y+6,w:CELL-12,h:CELL-12};
+  for(const o of obstacles){ if(rectHit(pr,o)){ die(); return; } }
+  for(const tr of trains){ if(rectHit(pr,tr)){ die(); return; } }
+}
+function checkCoin(){
+  for(const c of coins){
+    if(c.active && c.col===player.col && c.row===player.row){
+      c.active=false; score+=10; scoreEl.textContent=score; sCoin();
+      burst(player.x+CELL/2, player.y+CELL/2, 10);
+      if(Math.random()<0.6) spawnCoin();
+    }
+  }
+}
+function die(){
+  running=false; gameOver=true; statusEl.textContent='게임오버'; sHit(); bgmStop(); shakeT=0.3;
+}
+
+// ======= 그리기 =======
+function draw(){
+  // 카메라 셰이크
+  const sx = shakeT>0 ? (Math.random()-0.5)*10*shakeT : 0;
+  const sy = shakeT>0 ? (Math.random()-0.5)*10*shakeT : 0;
+  ctx.save(); ctx.translate(sx,sy);
+
+  // 하늘 그라데이션
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#16202f'); g.addColorStop(.5,'#0f1722'); g.addColorStop(1,'#0b0f18');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // 구름
+  ctx.fillStyle='rgba(255,255,255,.08)';
+  clouds.forEach(c=>{ ctx.beginPath(); ctx.arc(c.x,c.y,c.s,0,Math.PI*2); ctx.fill(); });
+
+  // 타일(아랫줄부터)
+  for(let r=0;r<ROWS;r++){
+    const y=r*CELL;
+    if(lanes[r]==='grass'){
+      // 잔디 타일 + 점묘
+      for(let c=0;c<COLS;c++){
+        ctx.fillStyle=((r+c)%2===0)?'#16331f':'#14311d';
+        ctx.fillRect(c*CELL,y,CELL,CELL);
+      }
+      ctx.fillStyle='rgba(255,255,255,.03)';
+      for(let i=0;i<10;i++) ctx.fillRect(rand(0,W), y+rand(0,CELL-2), 2,2);
+    } else if(lanes[r]==='road'){
+      ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,y,W,CELL);
+      // 중앙선 스크롤
+      ctx.strokeStyle='#bfbfbf'; ctx.lineWidth=3; ctx.setLineDash([10,14]); ctx.lineDashOffset = -roadStripe;
+      ctx.beginPath(); ctx.moveTo(0,y+CELL/2); ctx.lineTo(W,y+CELL/2); ctx.stroke(); ctx.setLineDash([]);
+    } else { // water
+      for(let c=0;c<COLS;c++){
+        const ph = Math.sin(waterPhase + c*0.6 + r*0.4)*4;
+        ctx.fillStyle='#0f3a52'; ctx.fillRect(c*CELL,y,CELL,CELL);
+        ctx.fillStyle='#115270'; ctx.fillRect(c*CELL,y+ph+8,CELL,8);
+        ctx.fillStyle='#0c2f44'; ctx.fillRect(c*CELL,y+CELL-12+ph,CELL,6);
+      }
+    }
+  }
+
+  // 코인
+  for(const c of coins){ if(!c.active) continue;
+    const frame=COIN_FR[c.fr||0]; drawSprite(frame, c.col*CELL+16, c.row*CELL+12, 2);
+  }
+
+  // 장애물
+  for(const o of obstacles){
+    // 공통 그림자
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(o.x+6,o.y+CELL-6,o.w-12,4);
+    if(o.type==='car'){
+      // 간단 픽셀 카
+      ctx.fillStyle='#ff5353'; ctx.fillRect(o.x+4,o.y+8,o.w-8,CELL-16);
+      ctx.fillStyle='#ffd0d0'; ctx.fillRect(o.x+o.w-18,o.y+12,12,10);
+      ctx.fillStyle='#333'; ctx.fillRect(o.x+8,o.y+CELL-12,10,8); ctx.fillRect(o.x+o.w-20,o.y+CELL-12,10,8);
+    } else {
+      // 통나무
+      ctx.fillStyle='#8b5a2b'; ctx.fillRect(o.x+2,o.y+10,o.w-4,CELL-20);
+      ctx.fillStyle='#b17a46'; ctx.fillRect(o.x+6,o.y+16,o.w-12,8);
+      ctx.fillStyle='#d7a46a'; ctx.fillRect(o.x+o.w-12,o.y+14,6,10);
+    }
+  }
+
+  // 기차
+  for(const tr of trains){
+    ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(tr.x, tr.y+CELL-6, tr.w, 4);
+    ctx.fillStyle='#e8e8e8'; ctx.fillRect(tr.x, tr.y+4, tr.w, CELL-8);
+    ctx.fillStyle='#9aa0a6'; ctx.fillRect(tr.x+6, tr.y+10, tr.w-12, 16);
+  }
+
+  // 플레이어(그림자 → 본체)
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(player.x+10, player.y+CELL-8, CELL-20, 6);
+  const frame = SPR[player.key][player.fr||0];
+  drawSprite(frame, Math.round(player.x)+8, Math.round(player.y)+6, 2);
+
+  // 파티클
+  particles.forEach(p=>{
+    ctx.fillStyle='rgba(255,232,120,'+(1-p.t/0.6)+')';
+    ctx.fillRect(p.x, p.y, 3,3);
+  });
+
+  if(gameOver){
+    ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 28px ui-sans-serif';
+    ctx.fillText('게임 오버', W/2, H/2 - 8);
+    ctx.font='14px ui-sans-serif'; ctx.fillText('다시 시작을 누르면 재시작', W/2, H/2 + 16);
+  }
+  ctx.restore();
+}
+
+// ======= 루프 =======
+function loop(ts){
+  const dt=Math.min(0.033,(ts-last)/1000 || 0); last=ts;
+  if(running&&!gameOver) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ======= 시작/재시작 =======
+function reset(){
+  score=0; elapsed=0; level=1; diff=1; shakeT=0;
+  player.col=Math.floor(COLS/2); player.row=ROWS-1;
+  player.tx=player.col; player.ty=player.row; player.x=player.col*CELL; player.y=player.row*CELL; player.moving=false; player.fr=0; player.frT=0;
+  build(); gameOver=false; running=true;
+  statusEl.textContent='플레이중'; scoreEl.textContent=0; levelEl.textContent=1; bgmStart();
+}
+restartBtn.addEventListener('click',()=>{ ensureAudio(); reset(); });
+startBtn.addEventListener('click',()=>{
+  ensureAudio(); player.key=chosen; selectPanel.classList.add('hidden'); reset();
+});
+
+// ======= 캐릭터 선택 미니 카드 =======
+const CHAR_SET=[
+  {key:'tiger',name:'호랑이'},{key:'rabbit',name:'토끼'},{key:'cat',name:'고양이'},{key:'dog',name:'강아지'},
+];
+let chosen='tiger';
+CHAR_SET.forEach(c=>{
+  const d=document.createElement('div'); d.className='char'+(c.key===chosen?' selected':''); d.innerHTML=`
+    <div style="display:flex;justify-content:center;align-items:center;height:64px">
+      <canvas width="64" height="64"></canvas>
+    </div>
+    <div style="font-weight:700">${c.name}</div>
+    <div class="small">${c.key}</div>`;
+  const cv=d.querySelector('canvas'); const cx=cv.getContext('2d'); cx.imageSmoothingEnabled=false;
+  cx.fillStyle='#111'; cx.fillRect(0,0,64,64);
+  drawSprite(SPR[c.key][1], 16, 12, 2); // 가운데 프레임
+  d.onclick=()=>{ chosen=c.key; [...charsWrap.children].forEach(x=>x.classList.remove('selected')); d.classList.add('selected'); };
+  charsWrap.appendChild(d);
+});
+
+// 탭 전환시 일시정지
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ running=false; statusEl.textContent=gameOver?'게임오버':'일시정지'; bgmStop(); }
+  else if(!gameOver){ running=true; statusEl.textContent='플레이중'; bgmStart(); last=performance.now(); }
+});
+</script>
+</body>
+</html>

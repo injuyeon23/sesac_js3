@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>길건너 친구들 - 네모 버전</title>
+<style>
+  /* 화면 배치 및 글꼴 스타일 정의함 */
+  :root{
+    --w:480px; --h:720px; --bg:#111; --ui:#222; --text:#eaeaea; --accent:#42b983;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#0b0b0b; color:var(--text); font-family:ui-sans-serif,system-ui,AppleSDGothicNeo,Segoe UI,Roboto,Apple Color Emoji, Noto Color Emoji;
+    display:flex; align-items:center; justify-content:center; min-height:100vh;
+  }
+  .wrap{display:flex; gap:16px; flex-direction:column; align-items:center}
+  .panel{
+    width:var(--w); background:var(--ui); border-radius:14px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.4);
+  }
+  canvas{display:block; width:var(--w); height:var(--h); background:#1a1a1a; border-radius:10px; outline:1px solid #2a2a2a}
+  .row{display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:8px}
+  .btn{flex:1; padding:10px 12px; border-radius:10px; border:1px solid #3a3a3a; background:#1c1c1c; color:var(--text); cursor:pointer}
+  .btn:hover{background:#252525}
+  .pill{padding:6px 10px; background:#1a1a1a; border:1px solid #333; border-radius:999px; font-size:12px}
+  .title{font-weight:700; font-size:18px}
+  .legend{display:flex; gap:8px; flex-wrap:wrap; font-size:12px; opacity:.9}
+  .hidden{display:none}
+  .char-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
+  .char{
+    border:2px solid #3a3a3a; border-radius:12px; padding:8px; text-align:center; cursor:pointer; background:#161616;
+  }
+  .char:hover{border-color:#777}
+  .char.selected{border-color:var(--accent); outline:3px solid rgba(66,185,131,.25)}
+  .center{display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .small{font-size:12px; opacity:.8}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <div class="row">
+        <div class="title">길건너 친구들 · 네모판</div>
+        <div class="legend">
+          <span class="pill">W/A/S/D = ↑/←/↓/→</span>
+          <span class="pill">위로 한 칸 = +1점</span>
+          <span class="pill">코인 = +10점</span>
+          <span class="pill">충돌 = 게임오버</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 캐릭터 선택 패널임 -->
+    <div class="panel" id="selectPanel">
+      <div class="title">캐릭터 선택 후 시작하기임</div>
+      <div class="char-grid" id="chars"></div>
+      <div class="row">
+        <button class="btn" id="startBtn">게임 시작</button>
+      </div>
+      <div class="small" style="margin-top:6px">심플 네모 스타일임 · 이미지 없이 색 블록으로 표시함</div>
+    </div>
+
+    <!-- 게임 패널 + 캔버스 -->
+    <div class="panel">
+      <canvas id="game" width="480" height="720"></canvas>
+      <div class="row">
+        <div>점수: <strong id="score">0</strong></div>
+        <div>상태: <strong id="status">대기중</strong></div>
+        <button class="btn" id="restartBtn">다시 시작</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ====== 기본 상수/그리드 설정 ====== */
+const W = 480, H = 720;                 // 요구된 캔버스 크기임
+const CELL = 48;                         // 1칸 크기임 (480/48=10칸, 720/48=15칸)
+const COLS = W / CELL;                   // 10
+const ROWS = H / CELL;                   // 15
+
+/* ====== 캔버스 준비 ====== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+/* ====== UI 요소 ====== */
+const scoreEl = document.getElementById('score');
+const statusEl = document.getElementById('status');
+const restartBtn = document.getElementById('restartBtn');
+const selectPanel = document.getElementById('selectPanel');
+const charsWrap = document.getElementById('chars');
+const startBtn = document.getElementById('startBtn');
+
+/* ====== 캐릭터(네모) 팔레트 정의 ====== */
+const CHAR_SET = [
+  { key:'tiger',  name:'호랑이', color:'#ff8c1a', accent:'#ffb347' }, // 주황
+  { key:'rabbit', name:'토끼',   color:'#d9d9d9', accent:'#f2f2f2' }, // 회백
+  { key:'cat',    name:'고양이', color:'#d06cf3', accent:'#f0b7ff' }, // 보라
+  { key:'dog',    name:'강아지', color:'#5ac8fa', accent:'#a6e1ff' }, // 하늘
+];
+
+/* 선택 UI 생성함 */
+let chosen = CHAR_SET[0].key;
+CHAR_SET.forEach(c=>{
+  const d = document.createElement('div');
+  d.className = 'char' + (c.key===chosen ? ' selected':'');
+  d.dataset.key = c.key;
+  d.innerHTML = `
+    <div style="width:100%;height:64px;display:flex;align-items:center;justify-content:center">
+      <div style="width:36px;height:36px;background:${c.color};border:3px solid #333;border-radius:6px"></div>
+    </div>
+    <div style="font-weight:700">${c.name}</div>
+    <div class="small">${c.key}</div>
+  `;
+  d.onclick = ()=>{
+    chosen = c.key;
+    [...charsWrap.children].forEach(x=>x.classList.remove('selected'));
+    d.classList.add('selected');
+  };
+  charsWrap.appendChild(d);
+});
+
+/* ====== 게임 상태 ====== */
+let game, lastTime=0, running=false, gameOver=false;
+
+/* 플레이어(그리드 기반) */
+const player = {
+  col: Math.floor(COLS/2),
+  row: ROWS-1,    // 맨 아래 줄에서 시작함
+  color:'#ff8c1a',
+  accent:'#ffb347',
+  maxRowReached: ROWS-1, // 위로 갈수록 줄 번호는 작아짐
+};
+
+/* 장애물/코인 컨테이너 */
+let obstacles = []; // {x,y,w,h, speedX}
+let trains = [];    // 별도 고속 객체 배열임
+let coins = [];     // {col,row, active}
+
+/* 점수 */
+let score = 0;
+
+/* 난수 유틸 */
+const rand = (min,max)=>Math.random()*(max-min)+min;
+const randint = (min,max)=>Math.floor(rand(min,max+1));
+
+/* 캐릭터 색 적용 */
+function applyCharacterSkin(key){
+  const c = CHAR_SET.find(v=>v.key===key) || CHAR_SET[0];
+  player.color = c.color; player.accent = c.accent;
+}
+
+/* 초기화 */
+function resetGame(){
+  score = 0;
+  player.col = Math.floor(COLS/2);
+  player.row = ROWS-1;
+  player.maxRowReached = ROWS-1;
+  obstacles = [];
+  trains = [];
+  coins = [];
+  spawnInitialWorld();
+  gameOver = false;
+  running = true;
+  statusEl.textContent = '플레이중';
+  scoreEl.textContent = score;
+}
+
+/* 월드(차선/통나무/기차선) 간단 레벨 구성함
+   - 3~11번째 줄에 무빙 라인 배치함
+   - 홀수줄: 자동차 오른쪽→왼쪽
+   - 짝수줄: 통나무 왼쪽→오른쪽 (충돌 시 게임오버로 단순화함)
+   - 특정 줄: 기차 초고속 한 칸 높이로 지나감
+*/
+function spawnInitialWorld(){
+  for(let r=3; r<=11; r++){
+    // 각 줄마다 2~4개 오브젝트 생성
+    const isCarLane = r%2===1;
+    const count = randint(2,4);
+    for(let i=0;i<count;i++){
+      const w = randint(1,2)*CELL; // 1~2칸 폭
+      const h = CELL;
+      const y = r*CELL;
+      let x, speedX;
+      if(isCarLane){
+        x = rand(0, W);            // 아무 위치에서 시작
+        speedX = -rand(60, 120);   // 왼쪽으로 이동(px/s)
+      } else {
+        x = rand(0, W);
+        speedX = rand(40, 90);     // 오른쪽으로 이동(px/s)
+      }
+      obstacles.push({x,y,w,h,speedX,type:isCarLane?'car':'log'});
+    }
+  }
+  // 기차선 두 줄 생성함 (빠른 위험 요소)
+  [5, 9].forEach(r=>{
+    trains.push({ x:-600, y:r*CELL, w: CELL*4, h:CELL, speedX: 360, cooldown: rand(1.5,3.5) });
+  });
+
+  // 코인 몇 개 뿌림
+  for(let i=0;i<5;i++){
+    spawnCoin();
+  }
+}
+
+/* 코인 스폰: 플레이어/장애물과 겹치지 않는 임의 위치에 생성 시도함 */
+function spawnCoin(){
+  const tries = 30;
+  for(let t=0;t<tries;t++){
+    const col = randint(0,COLS-1);
+    const row = randint(0,ROWS-2); // 맨 아래 제외
+    const coinRect = {x:col*CELL, y:row*CELL, w:CELL, h:CELL};
+    const hitsObs = obstacles.some(o=>rectIntersect(coinRect,{x:o.x,y:o.y,w:o.w,h:o.h}));
+    const hitsTrain = trains.some(tr=>rectIntersect(coinRect,{x:tr.x,y:tr.y,w:tr.w,h:tr.h}));
+    const hitsPlayer = (player.col===col && player.row===row);
+    if(!hitsObs && !hitsTrain && !hitsPlayer){
+      coins.push({col,row,active:true});
+      return;
+    }
+  }
+}
+
+/* 사각형 충돌 판정 */
+function rectIntersect(a,b){
+  return !(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
+}
+
+/* 입력: WASD 한 칸 이동 */
+window.addEventListener('keydown', (e)=>{
+  if(gameOver) return;
+  const k = e.key.toLowerCase();
+  let moved = false;
+  if(k==='a'){ // left
+    if(player.col>0){ player.col--; moved=true; }
+  } else if(k==='d'){ // right
+    if(player.col<COLS-1){ player.col++; moved=true; }
+  } else if(k==='w'){ // up
+    if(player.row>0){ player.row--; moved=true; score += 1; scoreEl.textContent = score; }
+  } else if(k==='s'){ // down
+    if(player.row<ROWS-1){ player.row++; moved=true; }
+  }
+  if(moved){
+    // 코인 획득 체크
+    collectCoinIfAny();
+  }
+});
+
+/* 코인 먹기 */
+function collectCoinIfAny(){
+  const idx = coins.findIndex(c=>c.active && c.col===player.col && c.row===player.row);
+  if(idx>=0){
+    coins[idx].active = false;
+    score += 10;
+    scoreEl.textContent = score;
+    // 일정 확률로 새 코인 스폰
+    if(Math.random()<0.7) spawnCoin();
+  }
+}
+
+/* 메인 루프 */
+function loop(ts){
+  if(!running){ requestAnimationFrame(loop); return; }
+  const dt = Math.min(0.033, (ts - lastTime)/1000 || 0);
+  lastTime = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* 업데이트 */
+function update(dt){
+  // 장애물 이동 + 화면 밖 래핑
+  for(const o of obstacles){
+    o.x += o.speedX * dt;
+    if(o.speedX>0 && o.x>W+20) o.x = -o.w;
+    if(o.speedX<0 && o.x<-o.w-20) o.x = W;
+  }
+  // 기차: 쿨다운 후 화면 관통 질주
+  for(const tr of trains){
+    tr.cooldown -= dt;
+    if(tr.cooldown<=0){
+      tr.x += tr.speedX * dt;
+      if(tr.x > W+400){
+        tr.x = -rand(400,700);
+        tr.cooldown = rand(2.0,4.0);
+      }
+    }
+  }
+
+  // 충돌 체크
+  const pRect = {x:player.col*CELL, y:player.row*CELL, w:CELL, h:CELL};
+  for(const o of obstacles){
+    if(rectIntersect(pRect, {x:o.x,y:o.y,w:o.w,h:o.h})){
+      endGame();
+      return;
+    }
+  }
+  for(const tr of trains){
+    if(rectIntersect(pRect, {x:tr.x,y:tr.y,w:tr.w,h:tr.h})){
+      endGame();
+      return;
+    }
+  }
+}
+
+/* 그리기 */
+function draw(){
+  // 배경(네모 타일 느낌)
+  ctx.fillStyle = '#121212';
+  ctx.fillRect(0,0,W,H);
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      ctx.fillStyle = ((r+c)%2===0) ? '#171717' : '#151515';
+      ctx.fillRect(c*CELL, r*CELL, CELL-1, CELL-1);
+    }
+  }
+
+  // 차선/통나무 라인 하이라이트(은은)
+  for(let r=3;r<=11;r++){
+    ctx.fillStyle = r%2===1 ? 'rgba(255,90,90,.05)' : 'rgba(120,180,255,.05)';
+    ctx.fillRect(0, r*CELL, W, CELL);
+  }
+  // 기차선 강조
+  [5,9].forEach(r=>{
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.fillRect(0, r*CELL, W, CELL);
+  });
+
+  // 코인
+  for(const c of coins){
+    if(!c.active) continue;
+    const x = c.col*CELL, y = c.row*CELL;
+    ctx.fillStyle = '#ffd84d';
+    ctx.fillRect(x+10, y+10, CELL-20, CELL-20);
+    ctx.strokeStyle = '#8a6f00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x+10, y+10, CELL-20, CELL-20);
+  }
+
+  // 장애물
+  for(const o of obstacles){
+    ctx.fillStyle = (o.type==='car') ? '#ff5a5a' : '#78bfff';
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+    ctx.strokeRect(o.x, o.y, o.w, o.h);
+  }
+
+  // 기차
+  for(const tr of trains){
+    ctx.fillStyle = '#eaeaea';
+    ctx.fillRect(tr.x, tr.y, tr.w, tr.h);
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 3;
+    ctx.strokeRect(tr.x, tr.y, tr.w, tr.h);
+  }
+
+  // 플레이어(네모) 그림
+  const px = player.col*CELL, py = player.row*CELL;
+  ctx.fillStyle = player.color;
+  ctx.fillRect(px+6, py+6, CELL-12, CELL-12);
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 3;
+  ctx.strokeRect(px+6, py+6, CELL-12, CELL-12);
+  // 액센트 띠
+  ctx.fillStyle = player.accent;
+  ctx.fillRect(px+6, py+6, CELL-12, 8);
+
+  // 게임오버 오버레이
+  if(gameOver){
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 28px ui-sans-serif';
+    ctx.fillText('게임 오버', W/2, H/2 - 10);
+    ctx.font = '16px ui-sans-serif';
+    ctx.fillText('다시 시작 버튼을 누르기 바람', W/2, H/2 + 18);
+  }
+}
+
+/* 종료 처리 */
+function endGame(){
+  running = false;
+  gameOver = true;
+  statusEl.textContent = '게임오버';
+}
+
+/* 시작/재시작 버튼 */
+restartBtn.addEventListener('click', ()=>{
+  resetGame();
+});
+startBtn.addEventListener('click', ()=>{
+  // 캐릭터 반영 후 게임 시작함
+  applyCharacterSkin(chosen);
+  selectPanel.classList.add('hidden');
+  statusEl.textContent = '플레이중';
+  resetGame();
+});
+
+/* 루프 시작 */
+requestAnimationFrame(loop);
+
+/* 품질: 탭 비활성 시 과도한 업데이트 방지용임 */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ running = false; statusEl.textContent = gameOver?'게임오버':'일시정지'; }
+  else if(!gameOver){ running = true; statusEl.textContent = '플레이중'; lastTime=performance.now(); }
+});
+</script>
+</body>
+</html>

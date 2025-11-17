@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=480, initial-scale=1"/>
+<title>길건너 친구들 · 픽셀 버전</title>
+<style>
+:root{ --w:480px; --h:720px; --ui:#1c1c1c; --text:#f2f2f2; --accent:#42b983; }
+*{box-sizing:border-box}
+body{margin:0; background:#0b0b0b; color:var(--text); font-family:ui-sans-serif,system-ui,Apple SD Gothic Neo,Segoe UI,Roboto}
+.wrap{display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px}
+.panel{width:var(--w); background:var(--ui); border-radius:14px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.title{font-weight:800}
+.small{opacity:.85; font-size:12px}
+canvas{display:block; width:var(--w); height:var(--h); background:#121212; border-radius:10px; outline:1px solid #2a2a2a}
+.row{display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:8px; flex-wrap:wrap}
+.btn{padding:10px 12px; border-radius:10px; border:1px solid #3a3a3a; background:#1c1c1c; color:var(--text); cursor:pointer}
+.btn:hover{background:#242424}
+.char-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
+.char{border:2px solid #333; border-radius:10px; padding:8px; text-align:center; cursor:pointer; background:#161616}
+.char.selected{border-color:var(--accent); outline:3px solid rgba(66,185,131,.25)}
+.hidden{display:none}
+.badge{padding:4px 8px; border-radius:999px; background:#151515; border:1px solid #333; font-size:12px}
+.pad{width:var(--w); display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:10px}
+.pad .cell{height:72px; display:flex; align-items:center; justify-content:center}
+.pad button{width:100%; height:100%; border-radius:12px; border:1px solid #3a3a3a; background:#171717; color:#eee; font-size:18px}
+.pad button:active{transform:scale(.98)}
+.pad .spacer{visibility:hidden}
+.footer-note{width:var(--w); text-align:center; font-size:12px; opacity:.8}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <div class="row">
+        <div class="title">길건너 친구들 · 픽셀 버전</div>
+        <div class="row" style="gap:6px">
+          <span class="badge">↑←↓→ = 이동</span>
+          <span class="badge">위로 한 칸 = +1점</span>
+          <span class="badge">코인 = +10점</span>
+          <span class="badge">충돌 = 게임오버</span>
+          <span class="badge">난이도 자동 상승</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="selectPanel">
+      <div class="title">캐릭터 선택 후 시작함</div>
+      <div class="small">“진짜 픽셀” 스프라이트로 표시함</div>
+      <div class="char-grid" id="chars"></div>
+      <div class="row">
+        <button class="btn" id="startBtn">게임 시작</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <canvas id="game" width="480" height="720" aria-label="game canvas"></canvas>
+      <div class="row">
+        <div>점수: <strong id="score">0</strong></div>
+        <div>레벨: <strong id="level">1</strong></div>
+        <div>상태: <strong id="status">대기중</strong></div>
+        <button class="btn" id="restartBtn">다시 시작</button>
+      </div>
+    </div>
+
+    <!-- 터치패드 (방향키 없는 장치 대비) -->
+    <div class="panel">
+      <div class="title">터치 패드</div>
+      <div class="pad" aria-label="touch pad">
+        <div class="cell"></div>
+        <div class="cell"><button id="btnUp">▲</button></div>
+        <div class="cell"></div>
+        <div class="cell"><button id="btnLeft">◀</button></div>
+        <div class="cell"><button id="btnDown">▼</button></div>
+        <div class="cell"><button id="btnRight">▶</button></div>
+      </div>
+      <div class="footer-note">모바일/노트북의 방향키 대체용임</div>
+    </div>
+  </div>
+
+<script>
+/* ===================== 기본 그리드/상태 ===================== */
+const W=480, H=720, CELL=48, COLS=W/CELL, ROWS=H/CELL;
+const canvas=document.getElementById('game'); const ctx=canvas.getContext('2d'); ctx.imageSmoothingEnabled=false;
+const scoreEl=document.getElementById('score'); const statusEl=document.getElementById('status'); const levelEl=document.getElementById('level');
+const restartBtn=document.getElementById('restartBtn'); const startBtn=document.getElementById('startBtn');
+const charsWrap=document.getElementById('chars'); const selectPanel=document.getElementById('selectPanel');
+
+let running=false, gameOver=false, lastTime=0, elapsed=0, level=1, diffFactor=1;
+
+/* ===================== 간단 오디오 엔진(WebAudio) ===================== */
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+}
+function beep({freq=440, dur=0.12, type='square', vol=0.1, when=0}={}){
+  if(!audioCtx) return;
+  const t=audioCtx.currentTime + when;
+  const o=audioCtx.createOscillator(); const g=audioCtx.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t); o.stop(t+dur+0.05);
+}
+let bgSeqTimer=null;
+function startBGM(){ // 간단 8비트 아르페지오 루프임
+  ensureAudio();
+  stopBGM();
+  const tempo=110; // bpm
+  const beat=60/tempo;
+  const scale=[261.63,329.63,392.00,523.25]; // C E G C
+  bgSeqTimer=setInterval(()=>{
+    if(!audioCtx) return;
+    const now=audioCtx.currentTime;
+    for(let i=0;i<8;i++){
+      const f=scale[i%scale.length];
+      beep({freq:f, dur:beat*0.35, type:'triangle', vol:0.05, when:i*beat*0.5});
+    }
+  }, beat*1000*8*0.5);
+}
+function stopBGM(){ if(bgSeqTimer){ clearInterval(bgSeqTimer); bgSeqTimer=null; } }
+function playJump(){ beep({freq:660, dur:0.08, type:'square', vol:0.12}); }
+function playCoin(){ beep({freq:800, dur:0.06, type:'square', vol:0.14}); beep({freq:1200, dur:0.06, type:'square', vol:0.12, when:0.06}); }
+function playHit(){ beep({freq:200, dur:0.18, type:'sawtooth', vol:0.2}); }
+function playDeathJingle(){ // 짧은 하강 멜로디임
+  const notes=[660,520,440,330,262];
+  notes.forEach((f,i)=>beep({freq:f, dur:0.12, type:'square', vol:0.15, when:i*0.11}));
+}
+
+/* ===================== 픽셀 스프라이트 유틸 ===================== */
+/* 스프라이트는 16x16 팔레트 인덱스 배열로 정의함 (0=투명) */
+function drawSprite(pix, palette, x, y, scale=2){
+  const size=16;
+  for(let r=0;r<size;r++){
+    for(let c=0;c<size;c++){
+      const idx=pix[r*size+c];
+      if(idx===0) continue;
+      ctx.fillStyle=palette[idx]||'#fff';
+      ctx.fillRect(x+c*scale, y+r*scale, scale, scale);
+    }
+  }
+}
+
+/* ===== 캐릭터 4종(호랑이/토끼/고양이/강아지) 예시 16x16 =====
+   간단한 아이콘 수준 픽셀 아트임 */
+const SPRITES = {
+  tiger: {
+    palette:[null,'#000000','#ff9a28','#ffd079','#ffffff'],
+    pix:(()=>{ // 얼룩 있는 주황 네모 고양이형
+      const a=[]; for(let i=0;i<256;i++) a[i]=0;
+      // 얼굴 바탕
+      for(let r=3;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=3; // 노랑
+      // 귀
+      a[2*16+4]=3; a[2*16+11]=3;
+      // 눈
+      a[7*16+6]=1; a[7*16+9]=1;
+      // 코/입
+      a[9*16+7]=1; a[9*16+8]=1; a[10*16+8]=1;
+      // 줄무늬
+      a[5*16+4]=1; a[5*16+11]=1; a[6*16+5]=1; a[6*16+10]=1;
+      // 볼터치
+      a[8*16+4]=2; a[8*16+11]=2;
+      return a;
+    })()
+  },
+  rabbit:{
+    palette:[null,'#000000','#f7f7f7','#ff9ac4','#ffffff'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=4;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      // 귀
+      for(let r=0;r<4;r++){ a[r*16+5]=2; a[r*16+10]=2; if(r<3){ a[r*16+6]=3; a[r*16+9]=3; } }
+      // 눈
+      a[7*16+6]=1; a[7*16+9]=1;
+      // 코/입
+      a[9*16+7]=3; a[9*16+8]=3; a[10*16+8]=1;
+      return a;})()
+  },
+  cat:{
+    palette:[null,'#000000','#b48cff','#e2c5ff','#ffffff'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=3;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      // 귀
+      a[2*16+4]=2; a[2*16+11]=2;
+      // 눈
+      a[7*16+6]=1; a[7*16+9]=1;
+      // 수염
+      a[8*16+3]=1; a[8*16+12]=1;
+      // 코/입
+      a[9*16+7]=1; a[9*16+8]=1; a[10*16+8]=1;
+      return a;})()
+  },
+  dog:{
+    palette:[null,'#000000','#8bd3ff','#bfe9ff','#ffffff'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=4;r<13;r++)for(let c=3;c<13;c++)a[r*16+c]=2;
+      // 귀(축 처진)
+      a[4*16+2]=2; a[5*16+2]=2; a[4*16+13]=2; a[5*16+13]=2;
+      // 눈
+      a[7*16+6]=1; a[7*16+9]=1;
+      // 코
+      a[9*16+7]=1; a[9*16+8]=1;
+      return a;})()
+  },
+  coin:{
+    palette:[null,'#000','#ffd84d','#ffea94','#8a6f00'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=4;r<12;r++)for(let c=4;c<12;c++)a[r*16+c]=2;
+      for(let r=5;r<11;r++)for(let c=5;c<11;c++)a[r*16+c]=3;
+      // 가장자리 음영
+      for(let i=4;i<12;i++){ a[4*16+i]=4; a[11*16+i]=4; a[i*16+4]=4; a[i*16+11]=4; }
+      return a;})()
+  },
+  car:{
+    palette:[null,'#000','#ff5a5a','#ffd0d0','#333'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      // 차체
+      for(let r=6;r<11;r++)for(let c=1;c<15;c++)a[r*16+c]=2;
+      // 창문
+      for(let r=7;r<9;r++)for(let c=9;c<13;c++)a[r*16+c]=3;
+      // 바퀴
+      a[11*16+3]=4; a[11*16+12]=4; a[12*16+3]=4; a[12*16+12]=4;
+      return a;})()
+  },
+  log:{
+    palette:[null,'#000','#8b5a2b','#b3793c','#d7a46a'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=6;r<10;r++)for(let c=1;c<15;c++)a[r*16+c]=2;
+      for(let r=7;r<9;r++)for(let c=2;c<14;c++)a[r*16+c]=3;
+      a[7*16+13]=4; a[8*16+2]=4; // 단면 하이라이트
+      return a;})()
+  },
+  train:{
+    palette:[null,'#000','#eaeaea','#9aa0a6','#3a3a3a'],
+    pix:(()=>{const a=[]; for(let i=0;i<256;i++)a[i]=0;
+      for(let r=4;r<12;r++)for(let c=0;c<16;c++)a[r*16+c]=2;
+      // 창
+      for(let r=6;r<9;r++)for(let c=3;c<6;c++)a[r*16+c]=3;
+      for(let r=6;r<9;r++)for(let c=7;c<10;c++)a[r*16+c]=3;
+      for(let r=6;r<9;r++)for(let c=11;c<14;c++)a[r*16+c]=3;
+      // 라인
+      for(let c=0;c<16;c++)a[10*16+c]=4;
+      return a;})()
+  }
+};
+
+/* ===================== 캐릭터 선택 UI ===================== */
+const CHAR_SET=[
+  {key:'tiger', name:'호랑이'},
+  {key:'rabbit', name:'토끼'},
+  {key:'cat',   name:'고양이'},
+  {key:'dog',   name:'강아지'},
+];
+let chosen='tiger';
+CHAR_SET.forEach(c=>{
+  const d=document.createElement('div');
+  d.className='char'+(c.key===chosen?' selected':''); d.dataset.key=c.key;
+  d.innerHTML=`<div style="width:100%;height:64px;display:flex;align-items:center;justify-content:center">
+    <canvas width="64" height="64"></canvas></div><div style="font-weight:700">${c.name}</div><div class="small">${c.key}</div>`;
+  const mini=d.querySelector('canvas').getContext('2d'); mini.imageSmoothingEnabled=false;
+  // 미니 스프라이트 그리기
+  drawSprite(SPRITES[c.key].pix, SPRITES[c.key].palette, 8, 8, 3);
+  // 위 줄은 메인 ctx를 쓰므로 미니에 다시 그림
+  mini.fillStyle='#161616'; mini.fillRect(0,0,64,64);
+  // 미니 렌더
+  (function renderMini(){
+    mini.fillStyle='#161616'; mini.fillRect(0,0,64,64);
+    drawSprite(SPRITES[c.key].pix, SPRITES[c.key].palette, 16, 16, 2);
+  })();
+
+  d.onclick=()=>{
+    chosen=c.key;
+    [...charsWrap.children].forEach(x=>x.classList.remove('selected'));
+    d.classList.add('selected');
+  };
+  charsWrap.appendChild(d);
+});
+
+/* ===================== 게임 상태 ===================== */
+const player={ col:Math.floor(COLS/2), row:ROWS-1, sprite:'tiger', maxRowReached:ROWS-1 };
+let obstacles=[]; // {x,y,w,h,speedX,type:'car'|'log'}
+let trains=[];    // {x,y,w,h,speedX,cooldown}
+let coins=[];     // {col,row,active:true}
+let score=0;
+
+function resetGame(){
+  score=0; elapsed=0; level=1; diffFactor=1;
+  player.col=Math.floor(COLS/2); player.row=ROWS-1; player.maxRowReached=ROWS-1;
+  obstacles=[]; trains=[]; coins=[];
+  buildWorld();
+  gameOver=false; running=true;
+  statusEl.textContent='플레이중'; scoreEl.textContent=score; levelEl.textContent=level;
+}
+function buildWorld(){
+  for(let r=3;r<=11;r++){
+    const isCar=r%2===1;
+    const count=2+((r%3)===0?1:0);
+    for(let i=0;i<count;i++){
+      const w=CELL*(isCar?2:2), h=CELL, y=r*CELL;
+      const x=Math.random()*W;
+      const speedX=(isCar?-1:1)*(isCar?rand(60,120):rand(40,90));
+      obstacles.push({x,y,w,h,speedX,type:isCar?'car':'log'});
+    }
+  }
+  [5,9].forEach(r=>trains.push({x:-600, y:r*CELL, w:CELL*4, h:CELL, speedX:360, cooldown:rand(1.5,3.5)}));
+  for(let i=0;i<5;i++) spawnCoin();
+}
+function spawnCoin(){
+  for(let t=0;t<30;t++){
+    const col=randint(0,COLS-1), row=randint(0,ROWS-2);
+    const coinRect={x:col*CELL,y:row*CELL,w:CELL,h:CELL};
+    const bad=obstacles.some(o=>rectIntersect(coinRect,o)) || trains.some(tr=>rectIntersect(coinRect,tr)) || (player.col===col&&player.row===row);
+    if(!bad){ coins.push({col,row,active:true}); return; }
+  }
+}
+const rand=(a,b)=>Math.random()*(b-a)+a; const randint=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const rectIntersect=(a,b)=>!(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y);
+
+/* ===================== 입력(방향키 + 터치패드) ===================== */
+function tryMove(dx,dy){
+  if(gameOver) return;
+  const nc=player.col+dx, nr=player.row+dy;
+  if(nc<0||nc>=COLS||nr<0||nr>=ROWS) return;
+  player.col=nc; player.row=nr;
+  // 점수/점프 사운드
+  if(dy===-1){ score+=1; scoreEl.textContent=score; playJump(); }
+  collectCoin();
+}
+window.addEventListener('keydown', (e)=>{
+  if(!running||gameOver) return;
+  if(e.key==='ArrowLeft') tryMove(-1,0);
+  else if(e.key==='ArrowRight') tryMove(1,0);
+  else if(e.key==='ArrowUp') tryMove(0,-1);
+  else if(e.key==='ArrowDown') tryMove(0,1);
+});
+['btnUp','btnLeft','btnRight','btnDown'].forEach(id=>{
+  const btn=document.getElementById(id);
+  const map={btnUp:[0,-1], btnLeft:[-1,0], btnRight:[1,0], btnDown:[0,1]};
+  const [dx,dy]=map[id];
+  const go=()=>tryMove(dx,dy);
+  btn.addEventListener('click', go, {passive:true});
+  btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); go(); }, {passive:false});
+});
+
+/* ===================== 코인 획득 ===================== */
+function collectCoin(){
+  const i=coins.findIndex(c=>c.active && c.col===player.col && c.row===player.row);
+  if(i>=0){ coins[i].active=false; score+=10; scoreEl.textContent=score; playCoin(); if(Math.random()<0.6) spawnCoin(); }
+}
+
+/* ===================== 난이도 곡선 =====================
+   - 시간 경과에 따라 속도/스폰 빈도 증가함
+   - 12초마다 레벨+1, 최대 난이도 제한 완만히 설정함 */
+function updateDifficulty(dt){
+  elapsed+=dt;
+  const newLevel=Math.floor(elapsed/12)+1; // 12초마다 상승
+  if(newLevel!==level){
+    level=newLevel; levelEl.textContent=level;
+    diffFactor = Math.min(1 + level*0.15, 3.0); // 최대 3배
+    // 추가 스폰 약간
+    if(Math.random()<0.7){
+      const r=randint(3,11); const isCar=r%2===1;
+      const w=CELL*2, h=CELL, y=r*CELL, x=(isCar?W:-w);
+      const speedX=(isCar?-1:1)*(isCar?rand(90,140):rand(70,120))*diffFactor;
+      obstacles.push({x,y,w,h,speedX,type:isCar?'car':'log'});
+    }
+  }
+}
+
+/* ===================== 루프 ===================== */
+function update(dt){
+  updateDifficulty(dt);
+  // 이동/래핑
+  for(const o of obstacles){
+    o.x += o.speedX*dt*diffFactor;
+    if(o.speedX>0 && o.x>W+20) o.x=-o.w;
+    if(o.speedX<0 && o.x<-o.w-20) o.x=W;
+  }
+  for(const tr of trains){
+    tr.cooldown -= dt;
+    if(tr.cooldown<=0){
+      tr.x += tr.speedX*dt*diffFactor*1.2;
+      if(tr.x>W+400){ tr.x=-rand(400,700); tr.cooldown=rand(2.0,4.0)/Math.max(1, diffFactor-0.2); }
+    }
+  }
+  // 충돌 체크
+  const p={x:player.col*CELL,y:player.row*CELL,w:CELL,h:CELL};
+  for(const o of obstacles){ if(rectIntersect(p,o)){ endGame(); return; } }
+  for(const tr of trains){ if(rectIntersect(p,tr)){ endGame(); return; } }
+}
+function draw(){
+  // 타일 배경
+  ctx.fillStyle='#101010'; ctx.fillRect(0,0,W,H);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ ctx.fillStyle=((r+c)%2===0)?'#151515':'#131313'; ctx.fillRect(c*CELL, r*CELL, CELL-1, CELL-1); }
+  // 위험 라인/기차 라인 음영
+  for(let r=3;r<=11;r++){ ctx.fillStyle=r%2===1?'rgba(255,90,90,.05)':'rgba(120,180,255,.05)'; ctx.fillRect(0,r*CELL,W,CELL); }
+  [5,9].forEach(r=>{ ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(0,r*CELL,W,CELL); });
+
+  // 코인
+  for(const c of coins){ if(!c.active) continue;
+    const x=c.col*CELL + 4, y=c.row*CELL + 4; drawSprite(SPRITES.coin.pix, SPRITES.coin.palette, x, y, 2);
+  }
+  // 장애물
+  for(const o of obstacles){
+    if(o.type==='car'){
+      drawSprite(SPRITES.car.pix, SPRITES.car.palette, Math.round(o.x)+4, o.y+4, 2);
+    }else{
+      drawSprite(SPRITES.log.pix, SPRITES.log.palette, Math.round(o.x)+4, o.y+8, 2);
+    }
+  }
+  // 기차
+  for(const tr of trains){ drawSprite(SPRITES.train.pix, SPRITES.train.palette, Math.round(tr.x), tr.y+0, 3); }
+
+  // 플레이어
+  const px=player.col*CELL + 4, py=player.row*CELL + 4;
+  const S=SPRITES[player.sprite]; drawSprite(S.pix, S.palette, px, py, 2);
+
+  // 게임오버 오버레이
+  if(gameOver){
+    ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 28px ui-sans-serif';
+    ctx.fillText('게임 오버', W/2, H/2 - 10);
+    ctx.font='16px ui-sans-serif'; ctx.fillText('다시 시작을 누르기 바람', W/2, H/2 + 18);
+  }
+}
+function loop(ts){
+  const dt=Math.min(0.033, (ts-lastTime)/1000 || 0); lastTime=ts;
+  if(running&&!gameOver){ update(dt); }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ===================== 종료/시작 ===================== */
+function endGame(){
+  running=false; gameOver=true; statusEl.textContent='게임오버';
+  playHit(); stopBGM(); playDeathJingle();
+}
+restartBtn.addEventListener('click', ()=>{ resetGame(); ensureAudio(); startBGM(); });
+startBtn.addEventListener('click', ()=>{
+  ensureAudio(); startBGM();
+  player.sprite=chosen; selectPanel.classList.add('hidden'); statusEl.textContent='플레이중'; resetGame();
+});
+
+/* ===================== 편의 ===================== */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ running=false; statusEl.textContent=gameOver?'게임오버':'일시정지'; }
+  else if(!gameOver){ running=true; statusEl.textContent='플레이중'; lastTime=performance.now(); }
+});
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
