@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #title {
+            color: green;
+        }
+
+    </style>
+</head>
+<body>
+    <h1 id="title">헬로우 DOM 버튼</h1>
+    <button onclick="changeRedColor()">빨강으로바꾸기</button>
+    <br>
+    <button onclick="changeBlueColor()">파랑으로바꾸기</button>
+    <br>
+    <button onclick="resetColor()">색상초기화</button>
+
+    <script>
+        // 함수는 각자의 목적에 맞게 간결하게 짜기 
+        function changeRedColor() {
+            let heading = document.getElementById("title");
+            heading.style.color = "red";
+            heading.style.backgroundColor = "yellow";
+            heading.style.width = "300px";
+        }
+        function changeBlueColor() {
+            let heading = document.getElementById("title");
+            heading.style.color = "blue";
+            heading.style.backgroundColor = "skyblue";
+            heading.style.width = "300px";
+        }
+        function resetColor() {
+            let heading = document.getElementById("title");
+            heading.removeAttribute("style");
+        }
+    </script>
+</body>
+</html>
