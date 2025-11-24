@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>숫자 맞추기 게임(1~100찍어 맞히기)</h1>
+    <input id="guessInput" type="number">
+    <button onclick ="checkguess()">시도</button>
+    <script>
+        const myNumber = Math.floor(Math.random()*100) + 1;
+        console.log(myNumber);
+
+        function checkguess() {
+            const userInput = document.getElementById("guessInput").value;
+            const result = document.getElementById("result")
+            console.log(userInput);
+            if (myNumber == userInput) {
+                console.log("맞음");
+                result.innerHTML = "<b>맞음</b>";
+            } else { 
+                console.log("틀림");
+                result.innerHTML = "<b>틀림</b>";
+            }
+            }
+
+
+    </script>
+    <div id="result"></div>
+</body>
+</html>
+<!-- \
+미션1. const guesses = [10, 20, 50, 70, 80, 90]; (for로 반복하면 됨)
+미션2. 1부터 100까지 찍기 정답이 나오면 멈춤 
+미션3. 결과를 보고 결과에 따라서 binary search를 해서 맞춘다 
+-->
+<!-- 
+        const guesses = [10, 20, 50, 70, 80, 90]; 
+        for (let i = 0; i < guesses.length; i++) {
+            console.log(guesses[i]);
+        }
+
+        for (let i = 0; v <= 100; v++) {
+            inputBox.value = v;
+            trialButton.click();
+            if (result == "맞음") {
+            break;
+            }
+        }
+
+-->
+
+function myLateFunction() {
+    console.log("출력")
+    clearInterval(timerld);
+}
+setInterval(myLateFunction, 1000)
+
+const timerld = setInterval(myLateFunction, 1000);
+
+=> 
+
+const timerld = setInterval(() => {
+    console.log("출력")
+    clearInterval(timerId);
+}, 1000); 
+<!-- 1000ms: 1s -->
+
+
+==================
+
+const guesses = [10, 20, 50, 70, 80, 90];
+
+const inputBox = 
+document.getElementById("guessInput");
+
+const trialButton = document.getElementById("trial")
+
+const timerld - setInterval(() => {
+    inputBox.value = guesses[index];
+    console.log("입력시도: " + inputBox.value);
+    index++;
+    trialButton.click();
+
+    if (index == guess.length) {
+        clearInterval(timerld)
+    }
+}, 1000);
+
+

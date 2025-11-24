@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        input {
+            width: 150px;
+        }
+        #prgressBar {
+            width: 100%;
+            background-color: #f3f3f3;
+        }
+        #progress {
+            width: 5px;
+            height: 30px;
+            background-color: aquamarine;
+        }
+
+
+    </style>
+</head>
+<body>
+    <h1>프로그래스 바 타이머</h1>
+    <input id="timeInput" type ="number" placeholder="초를 입력하세요" min="2" max="10">
+    <button onclick="startProgress()"  id="startButton">시작</button>
+    <button id="resetButton">초기화</button>
+    <div id="progressBar">
+        <div id="progress"></div>
+    </div>
+    <script> 
+        function startProgress() {
+            if (timerId) {
+                clearInterval(timerId); 
+            }
+            const timeInput = document.getElementById("timeInput").value;
+            const progressBar = document.getElementById("progress")
+            // startButton.disabled = true;
+
+            console.log("버튼 클릭됨: 입력숫자: ",timeInput);
+            let progress = (100/ timeInput);
+            // console.log("프로그레스: ", progress);
+            // progressBar.style.width = progress + "%"
+         
+            let timePassed = 0;
+            timeId - setInterval(() => {
+                console.log("프로그레스 계산중: ", progress);
+                progressBar.style.width = `${progress}%`;
+                timePassed++; 
+                progress = (100/ timeInput) * timePassed;
+                progressBar.style.width = `${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(timerId)
+                }
+            } ,1000); 
+        }
+
+    </script>
+   
+
+</body>
+</html>
+
+<!-- 2를 넣으면 100/2 = 50%  -->
+100 / 2 = 50% 
+
+*2 100/3 
+100 /2 => 50% => 100% 
+*결국 최종은 100에 도달 
+현재 퍼센티지 폭 = 100 / 입력값 
+
+*3 100/4
+*3 100/5 
+
+
+
+
+
+<!-- 
+음수, 0을 입력받고 싶지 않음 => min, max
+시작 -> 주어진 입력값을 가져와서 setlnterval로 매초마다 몇 등분을 반복할겆니 정의 
+
+DOM을 가져온다 연산 
+
+
+
+-->
+
+
