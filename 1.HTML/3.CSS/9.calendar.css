@@ -7,7 +7,7 @@
             width: 10%;
             border: 1px solid black;
         }
-        th:first-child {
+        th:first-child { /*각tr줄 안에서 제일 첫번째 th만 골라서 스타일 준다 */ 
             color: red; 
         }
         .week {
@@ -23,6 +23,7 @@
             padding-top: 40%;
             background-image: url(../2.MAIN/image/christmas.jpg);
             background-size: contain;
-            background-repeat: no-repeat;
+            /* 이미지가 잘리지 않도록 보이게만 축소 확장(잘리지 않음, 대신 빈공간 생길 수 있음) */
+            background-repeat: no-repeat; /*배경이 반복되는 걸 막음 */
             background-position: center;
         }

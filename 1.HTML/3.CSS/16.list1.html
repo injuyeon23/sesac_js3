@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        ul {
+            list-style-type: none; /*원래 ul은 자동으로 동그라미가 붙는데 그걸 쓰지 않고 커스텀 아이콘 별을 넣고 싶음 */
+        }
+        ul li::before { /*li앞에 보이지 않는 가짜요소를 만들어서 콘텐츠 넣기*/
+            content: "☆";
+            color: red;
+            width: 10px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <ul>
+            <li>아메리카노</li>
+            <li>카푸치노</li>
+            <li>에스프레소</li>
+        </ul>
+    </div>
+</body>
+</html>

@@ -11,11 +11,11 @@
             background-color: red;
             animation-name: moveleft;
             color: white;
-            position: relative; /*이게 있어야 애니메이션 시작됨*/
+            position: relative; /*이게 있어야 애니메이션 시작됨, relative 기준으로 옆으로 밀기 */
             animation-duration: 3s;
             animation-iteration-count: ease-out;
-            animation-timing-function: linear;
-            animation-direction: alternate;
+            animation-timing-function: linear; /* 일정한 속도로 이동*/
+            animation-direction: alternate; /* 왕복 애니메이션 */
             
         }
 
@@ -36,7 +36,7 @@
             color: black;
             animation-name: fadeout;
             animation-duration: 2.0s;
-            animation-iteration-count: infinite;
+            animation-iteration-count: infinite; /*무한 반복*/
             animation-timing-function: linear;
         }
         @keyframes fadeout {
@@ -53,22 +53,21 @@
             background-color: blue;
             color: white;
             text-align: center;
-            border-radius: 50%;
+            border-radius: 50%; /*완전한 동그라미 만들기, 정사각형일때 50% 주면 완전 동그라미 */
             animation-name: rotateandsacle;
             animation-duration: 3s;
-            animation-iteration-count: infinite;
-            animation-iteration-count: 5;
-            animation-timing-function: ease-out;
+            animation-iteration-count: 5; /*5번 반복 */
+            animation-timing-function: ease-out; /*속도 곡선 시작은 빠르게 끝으로갈수록 천천히*/
         }
         @keyframes rotateandsacle {
             0% {
-                transform: rotate(0deg);scale(1);
+                transform: rotate(0deg) /*회전 안된 상태*/ scale(1); /*원래크기100%*/
             }
             50% {
-                transform: rotate(180deg);scale(1.5);
+                transform: rotate(180deg) /*반바퀴 회전*/ scale(1.5); /*1.5배 커짐*/
             }
-            1000% {
-                transform: rotate(360deg);scale(1);
+            100% {
+                transform: rotate(360deg) /*한바퀴 회전*/ scale(1);
             }
         }
         .image {
@@ -106,3 +105,22 @@
     <img class="image" src="../2.MAIN/image/christmas.jpg">
 </body>
 </html>
+
+
+애니메이션 설명 
+
+[1] 요소에게 애니메이션을 적용하는 부분 (.box, .text, .circle 등)
+[2] 애니메이션의 동작을 정의하는 부분 (@keyframes ...)
+
+.box {
+   animation-name: moveleft;
+   animation-duration: 3s;
+}
+
+@keyframes moveleft {
+   0% { left: 0; }
+   100% { left: 200px; }
+
+CSS .box = '어떤 애니메이션을 쓸지'
+keyframes = '애니메이션이 실제로 어떻게 움직일지'
+
