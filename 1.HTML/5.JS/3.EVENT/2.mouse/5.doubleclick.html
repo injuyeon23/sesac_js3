@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #divArea {
+            width: 200px;
+            height: 50px;
+            border: 1px solid red;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>더블클릭 테스트</h1>
+    <div id="divArea">여기 클릭하자</div>
+    <script>
+        const divArea = document.getElementsById("divArea");
+        divArea.addEventListener("lclick", () => {
+            console.log("클릭했을 때 호출할 콜백함수 실행파트")
+        })
+        divArea.addEventListener("dblclick", () => {
+            console.log("더블 클릭했을 때 호출할 콜백함수 실행파트")
+        })
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #myElement {
+            width: 100%; 
+            height: 200px;
+            background-color: lightgray;
+            overflow-y: scroll;
+        }
+        #innerElement {
+            height: 800px;
+            background: linear-gradient(to bottom, orange 0% red 100%);
+        }
+    </style>
+</head>
+<body>
+    <h1>마우스 휠 이벤트</h1>
+    <div id="myElement"></div>
+        <div id='innerElement'></div>
+    <script>
+        document.addEventListener('wheel', (ev) => {
+            const box = document.getElementById('myElement');
+            console.log(`마우스 휠 감지됨: ${ev.deltaY}`);
+            console.log(`상단으로부터의 거리(scrollTop): ${box.scrollTop}`);
+
+        });
+    </script>
+</body>
+</html>
