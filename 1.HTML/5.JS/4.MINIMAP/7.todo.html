@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>투두리스트</h1>
+    <input type="text" id="new-todo" placeholder="할일을 입력하시오">
+    <button id="add-todo">입력</button>
+
+    <uL id="todo-list"></ul>
+
+    <script>
+        // 1. 버튼을 가져온다 
+        const newTodo = document.getElementById('new-todo').value;
+        const addBtn = document.getElementById('add-todo')
+        // 2. 버튼 클릭 동작시킨다
+        addBtn.addEventListener('click', () => {
+            //3. 입력 항목을 가져온다 
+            console.log(newTodo);
+            // 4. 빈칸의 입력을 맏는다 
+            //  if (newTodo === "" //다른 모든 개발 언어에서는 == js에서는 ===) { //빈칸일 경우
+            //     alert('빈칸은 입력하실 수 없습니다');
+            //     return;
+            // }
+            if (newTodo.trim() == '') {
+                console.log('빈값')
+                return;
+            }
+
+            // 5.입력을 성공했으면 입력칸을 다시 지운다 
+            document.getElementById('new-todo').value ="";
+            
+
+            const new_li = document.createElement('li');
+            new_li.textContent = newTodo;
+
+            const todoList = document.getElementById('todo-list');
+            todoList.appendChild(new_li);
+
+        
+            // 별도의 이벤트.엔터를 통해 입력한다 
+            const newTodo = document.getElementById('new-todo').value;
+            newTodo.addEventListener('keydown', (event) => {
+                if (event.key == 'Enter') {
+                    addBtn.click();
+                }
+            })
+
+
+
+        })
+    </script>
+    
+</body>
+</html>
